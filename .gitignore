@@ -16,15 +16,14 @@ build/*.exe
 build/*.AppImage
 build/_icon64.png
 
-# 原生工程：android/ 提交进仓库（内部自带 .gitignore 处理构建产物），
-# ios/ 需要 macOS 才能生成，本地没生成过就先忽略
-ios/
+# 原生工程：android/ 和 ios/ 都提交进仓库（内部自带 .gitignore 处理构建产物）
 *.hprof
 
 # 本地缓存 / 临时目录
 .npm-cache/
 .tmp-ssh/
 .shots/
+.android-tools/
 *.log
 npm-debug.log*
 yarn-debug.log*

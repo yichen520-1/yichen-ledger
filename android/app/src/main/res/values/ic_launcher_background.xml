@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- 自适应图标的底板色，与应用的深色主题一致（原来是生成器给的 #FFFFFF） -->
+    <color name="ic_launcher_background">#0F1216</color>
 </resources>

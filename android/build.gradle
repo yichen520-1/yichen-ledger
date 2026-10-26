@@ -3,6 +3,10 @@
 buildscript {
     
     repositories {
+        // 阿里云镜像放前面：国内直连 mavenCentral 经常超时导致构建失败，
+        // 镜像没命中时会自动回落到下面的 google() / mavenCentral()
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
         google()
         mavenCentral()
     }
@@ -19,6 +23,8 @@ apply from: "variables.gradle"
 
 allprojects {
     repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
         google()
         mavenCentral()
     }

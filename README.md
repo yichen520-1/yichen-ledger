@@ -174,19 +174,32 @@ npx cap open android      # 在 Android Studio 里运行 / 打 APK
 注意重新生成后再手动改一次 `android/app/src/main/res/values/strings.xml`
 里的 `app_name`（生成器默认会写成英文名）。
 
-> 本机没有装 Android SDK，所以仓库里只有工程骨架、没有 APK 产物。
+> 仓库里没有 APK 产物（3.9 MB 的 debug 包不进版本库），
 > 用 Android Studio 打开 `android/` 目录，等 Gradle 同步完就能直接跑真机或模拟器。
+
+> **排坑：项目路径含中文。** AGP 遇到非 ASCII 路径会直接拒绝构建，报
+> `Your project path contains non-ASCII characters`。仓库里已经在
+> `android/gradle.properties` 打开 `android.overridePathCheck=true`，
+> 实测能正常编译出 APK。另外 `android/build.gradle` 里加了阿里云 Maven
+> 镜像放在 `google()` / `mavenCentral()` 前面 —— 国内直连 Maven Central
+> 经常超时，会报 `Could not resolve org.jetbrains.kotlin:kotlin-stdlib-jdk8`。
 
 ### iOS（Capacitor）
 
-需要在 macOS 上、装好 Xcode：
+`ios/` 工程骨架也已经生成好并提交了。构建必须在 macOS 上、装好 Xcode：
 
 ```bash
 npm run build
-npx cap add ios          # 第一次
 npm run cap:sync
 npx cap open ios         # 在 Xcode 里运行 / 打包
 ```
+
+> Windows 上没法编译 iOS，但 Capacitor 是跨平台的，在 Windows 上照样能
+> 生成 `ios/` 工程（只是会跳过 `pod install`）。到 Mac 上先跑一次
+> `npx cap sync ios` 装好 Pod 依赖，再用 Xcode 打开。
+>
+> 上架 App Store 还需要 Apple 开发者账号（$99/年）配置签名，
+> 只想自己用的话用免费个人账号装到自己的设备上就行（7 天要重签一次）。
 
 ---
 
