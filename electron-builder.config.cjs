@@ -48,6 +48,10 @@ module.exports = {
     icon: 'build/icon.ico',
     // 没有代码签名证书，明确关掉，否则构建会一直警告
     signAndEditExecutable: true,
+    // 产物文件名用纯 ASCII：GitHub Release 会把资产名里的非 ASCII 字符
+    // 统统替换成「.」，用中文名上传上去就变成 "-0.1.0.exe" 这种残废名字。
+    // 安装后显示的名字、快捷方式、窗口标题仍然是「忆尘记账」，不受影响。
+    artifactName: 'yichen-ledger-${version}-win-${arch}.${ext}',
   },
 
   nsis: {
@@ -67,11 +71,14 @@ module.exports = {
     icon: 'build/icon.png',
     // 没有 Apple 开发者证书，跳过签名；否则打包会失败
     identity: null,
+    // 同 win：Release 资产名必须是纯 ASCII
+    artifactName: 'yichen-ledger-${version}-mac-${arch}.${ext}',
   },
 
   linux: {
     target: ['AppImage'],
     category: 'Office',
     icon: 'build/icon.png',
+    artifactName: 'yichen-ledger-${version}-linux-${arch}.${ext}',
   },
 };
