@@ -7,6 +7,26 @@
 
 ---
 
+## 🌐 直接用：网页版（最快上手）
+
+**<https://yichen520-1.github.io/yichen-ledger/>**
+
+不用装任何东西，手机和电脑的浏览器打开就能记账。这是一个完整的 PWA：
+
+| 平台 | 怎么装成 App |
+| --- | --- |
+| iPhone / iPad | Safari 打开 → 分享按钮 → **添加到主屏幕** |
+| Android | Chrome 打开 → 右上角菜单 → **安装应用** / 添加到主屏幕 |
+| Windows / macOS | Chrome / Edge 地址栏右侧的**安装**图标 |
+
+装到主屏幕后**全屏运行、没有地址栏**，图标就是应用自己的图标，用起来和原生 App 没有区别。
+装过一次之后**断网也能用**（Service Worker 缓存了所有静态资源，数据本来就在本机）。
+
+> 网页版和原生包用的是同一份代码、同一个 IndexedDB 库结构，但**数据不互通**
+> （不同域名算不同的存储）。长期用建议固定一个平台，或者用「设置 → 导出备份」搬数据。
+
+---
+
 ## 技术选型
 
 | 层 | 选型 | 为什么 |
@@ -14,6 +34,7 @@
 | 界面 | React 18 + TypeScript + Vite | 生态成熟、构建快，Web 技术栈能一套代码覆盖四端 |
 | 移动端 | Capacitor 7 | 把同一份 web 产物装进原生壳，能上架 App Store / 应用商店 |
 | 桌面端 | Electron 33 | Windows/macOS 上开箱即用，不需要用户额外装运行环境 |
+| 网页版 | PWA + GitHub Pages | 免安装、免审核，iOS 上没有 Mac 也能先用起来 |
 | 数据 | IndexedDB + Dexie 4 | 离线可用、无后端、四端 API 一致 |
 | 路由 | HashRouter | Electron 用 `file://`、Capacitor 用 `capacitor://localhost`，只有 hash 路由在四端行为一致 |
 | 金额 | **以「分」为单位的整数** | 彻底避免 `0.1 + 0.2 !== 0.3` 这类浮点误差 |
@@ -94,13 +115,14 @@ npm run electron
 
 ### 自检脚本
 
-仓库里带了三个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
+仓库里带了四个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
 
 ```bash
 npm run build
 npx vite preview --port 4173 &      # 先起一个静态服务
 node scripts/smoke.mjs              # 用真实 Chrome 走一遍记账流程并截图到 .shots/
 node scripts/flows.mjs              # 深流程：预算超支、建账户、改账目、建分类、持久化
+node scripts/pwa-check.mjs          # 网页版：manifest、图标、SW 缓存、断网后还能打开
 
 # 或者验证桌面端（Electron 直接加载 dist/index.html）
 node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edata scripts/electron-check.cjs
@@ -109,6 +131,8 @@ node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edat
 `scripts/smoke.mjs` 会：打开首页 → 输入金额 → 选分类 → 保存 → 回首页确认 → 遍历统计/预算/我的/账户/分类 → 桌面宽度再截一轮，任何控制台报错都会让脚本以非 0 退出。
 
 `scripts/flows.mjs` 会：新建总预算 → 记一笔 1500 元把钱花超 → 断言进度条变红 → 新建账户 → 点首页的账目进编辑页改金额 → 新建分类 → 刷新页面确认 IndexedDB 里数据还在。
+
+`scripts/pwa-check.mjs` 会：断言 manifest 能被解析且 display 是 standalone → 四个图标都能下载 → Service Worker 进入 `activated` → 缓存里真的有 index.html 和带 hash 的 JS → **切到离线模式后刷新，页面照样能打开**。最后一项是网页版能不能「装到主屏当 App 用」的关键。
 
 ### 推送代码时如果连不上 GitHub
 
@@ -203,6 +227,31 @@ npx cap open ios         # 在 Xcode 里运行 / 打包
 
 ---
 
+## 网页版部署（GitHub Pages）
+
+推送到 `main` 之后 GitHub Actions 会自动构建并发布，配置在
+[.github/workflows/deploy-pages.yml](.github/workflows/deploy-pages.yml)：
+
+**<https://yichen520-1.github.io/yichen-ledger/>**
+
+流程是：`npm ci` → `npm test` → `npm run build` → 上传 `dist/` 到 Pages。
+想手动重新发布就在 Actions 页面点一次 `Run workflow`。
+
+因为 `vite.config.ts` 里 `base` 用的是相对路径 `'./'`，产物既能放在
+`https://yichen520-1.github.io/yichen-ledger/` 这样的子路径下，也能
+直接被 Electron 用 `file://` 打开，一份产物四种用法。
+
+> PWA 的离线能力由 [public/sw.js](public/sw.js) 提供。它在 `install` 阶段
+> 会去解析 `index.html`，把里面带 hash 的 `assets/*.js`、`*.css` 一起预缓存 ——
+> 这一步不能省：Service Worker 是页面加载完才注册的，第一次加载的 JS
+> 根本不经过它，不预缓存的话「装完马上断网」会白屏。
+>
+> 换了资源就要让用户拿到新版本，所以缓存名 `CACHE = 'yichen-ledger-v1'`
+> 改动后要顺手升个号。Electron（`file://`）和 Capacitor（`https://localhost`）
+> 里会跳过注册，靠 `window.Capacitor` 判断，避免壳里读到旧缓存。
+
+---
+
 ## 目录结构
 
 ```
@@ -214,10 +263,16 @@ src/
   pages/                 总览 / 记一笔 / 统计 / 预算 / 我的 / 账户 / 分类
   components/Toast.tsx   轻提示
   styles.css             深色主题，移动优先，>=900px 切桌面布局
+public/
+  manifest.webmanifest   PWA 清单（名字、图标、快捷方式）
+  sw.js                  Service Worker：离线缓存
+  pwa-*.png              网页版图标
 tests/domain.test.ts     领域层单元测试
 electron/main.cjs        桌面端主进程
 capacitor.config.ts      移动端配置
-scripts/                 自检脚本（浏览器冒烟 + Electron 加载验证）
+build/                   electron-builder 用的图标（由 scripts/make-icon.py 生成）
+.github/workflows/       GitHub Pages 自动部署
+scripts/                 自检脚本 + 图标生成
 ```
 
 ---
