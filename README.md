@@ -161,14 +161,21 @@ python scripts/make-icon.py
 
 ### Android（Capacitor）
 
-需要先装好 Android Studio + JDK 17+：
+Android 工程已经在 `android/` 目录里生成好并提交进仓库了，
+换一台机器只要重装依赖就能接着用。构建需要 Android Studio（或 SDK + JDK 17+）：
 
 ```bash
 npm run build
-npx cap add android      # 第一次
-npm run cap:sync
-npx cap open android     # 在 Android Studio 里运行 / 打包
+npm run cap:sync          # 把 dist/ 同步进 android/
+npx cap open android      # 在 Android Studio 里运行 / 打 APK
 ```
+
+如果 `android/` 目录被删了，用 `npx cap add android` 重新生成，
+注意重新生成后再手动改一次 `android/app/src/main/res/values/strings.xml`
+里的 `app_name`（生成器默认会写成英文名）。
+
+> 本机没有装 Android SDK，所以仓库里只有工程骨架、没有 APK 产物。
+> 用 Android Studio 打开 `android/` 目录，等 Gradle 同步完就能直接跑真机或模拟器。
 
 ### iOS（Capacitor）
 

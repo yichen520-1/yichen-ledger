@@ -16,8 +16,8 @@ build/*.exe
 build/*.AppImage
 build/_icon64.png
 
-# 原生工程（由 `npx cap add` 生成，可按需重新生成）
-android/
+# 原生工程：android/ 提交进仓库（内部自带 .gitignore 处理构建产物），
+# ios/ 需要 macOS 才能生成，本地没生成过就先忽略
 ios/
 *.hprof
 
