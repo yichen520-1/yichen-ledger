@@ -7,6 +7,31 @@
 
 ---
 
+## 📦 下载安装包
+
+所有平台的现成安装包都在这里，**不需要自己编译**：
+
+**<https://github.com/yichen520-1/yichen-ledger/releases/latest>**
+
+| 平台 | 文件 | 说明 |
+| --- | --- | --- |
+| Windows | `yichen-ledger-0.1.0-win-x64.exe` | 安装版，可选安装目录 |
+| Windows | `yichen-ledger-0.1.0-win-x64.zip` | 免安装，解压即用 |
+| macOS（Apple 芯片） | `yichen-ledger-0.1.0-mac-arm64.dmg` | M1/M2/M3/M4 |
+| macOS（Intel） | `yichen-ledger-0.1.0-mac-x64.dmg` | 老款 Mac |
+| Linux | `yichen-ledger-0.1.0-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
+| Android | `app-debug.apk` | 手机浏览器下载后点安装 |
+| iOS | `yichen-ledger-unsigned.ipa` | **未签名**，需自行重签，见下方说明 |
+
+> 没有代码签名证书和 Apple 开发者账号，所以：
+> Windows 首次运行会提示「未知发布者」（点「更多信息 → 仍要运行」）；
+> macOS 首次打开要在「系统设置 → 隐私与安全性」里点「仍要打开」；
+> iOS 的 ipa 是未签名的，用 SideStore / Sideloadly 重签后才能装。
+
+被这些提示卡住、或者只是想先试试，**直接用上面的网页版最省事**。
+
+---
+
 ## 🌐 直接用：网页版（最快上手）
 
 **<https://yichen520-1.github.io/yichen-ledger/>**
@@ -266,6 +291,13 @@ git push origin v0.1.0
 | ios | `macos-latest` + CocoaPods | 未签名 ipa |
 
 也可以去 Actions 页面手动 `Run workflow`，那样只留 artifact 不建 Release。
+
+> **产物文件名是纯 ASCII。** GitHub 会把 Release 资产名里的非 ASCII 字符
+> 统统替换成 `.`（`忆尘记账 Setup 0.1.0.exe` 会变成 `Setup.0.1.0.exe`），
+> 所以 `electron-builder.config.cjs` 里给三端都设了 `artifactName`，
+> 统一成 `yichen-ledger-<版本>-<平台>-<架构>.<扩展名>`。
+> 装好之后显示的名字、快捷方式、窗口标题仍然是「忆尘记账」，不受影响。
+
 
 > **iOS 的包是未签名的。** 没有 Apple 开发者证书，`xcodebuild` 只能出
 > `CODE_SIGNING_ALLOWED=NO` 的产物，iPhone 上直接装不了。拿到后用
