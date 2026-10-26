@@ -25,6 +25,31 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* 深色主题下滚动条默认是浅灰的，在 Electron 里特别扎眼 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 2px solid var(--bg);
+  border-radius: 6px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #333c49;
+}
+
 html,
 body,
 #root {
