@@ -136,19 +136,38 @@ node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edat
 
 ### 推送代码时如果连不上 GitHub
 
-这台机器上 `github.com` 的 DNS 有时会解析到 `20.205.243.166`，该地址的 443 端口不通，
-表现为 `Failed to connect to github.com:443` 或 `Connection was reset`。
-`140.82.112.4` / `140.82.116.4` 是可用的。
+这台机器到 GitHub 的 HTTPS 经常连不上，分两种表现：
 
-`hosts` 文件需要管理员权限才能改，所以仓库外（`.tmp-ssh/`，已被 gitignore）留了一个
-本地 CONNECT 代理，把连接强制转到可用 IP：
+| 表现 | 说明 |
+| --- | --- |
+| `Failed to connect to github.com:443` / `Connection was reset` | DNS 解析到的 IP 该端口不通 |
+| `OpenSSL SSL_read: unexpected eof while reading` | TCP 和 TLS 都握手成功了，但 HTTP 请求发出去就没回音 |
+
+第二种最迷惑人：`Test-NetConnection github.com -Port 443` 明明返回 `True`，
+`git push` 却一直超时。原因是端口能建立连接不代表整条链路通。**这时换 SSH 最省事**：
+
+```bash
+# 一次性：生成密钥并把公钥加到仓库的 Deploy keys（勾选 Allow write access）
+ssh-keygen -t ed25519 -f ~/.ssh/yichen_ledger -N "" -C "yichen-ledger deploy"
+# 然后把 ~/.ssh/yichen_ledger.pub 的内容贴到
+#   https://github.com/yichen520-1/yichen-ledger/settings/keys
+
+# 让这个仓库走 SSH（只写进 .git/config，不会提交）
+git remote set-url origin git@github.com:yichen520-1/yichen-ledger.git
+git config --local core.sshCommand 'ssh -i ~/.ssh/yichen_ledger -o BatchMode=yes'
+```
+
+实测 `github.com:22` 与 `ssh.github.com:443` 都通，SSH 比 HTTPS 稳得多。
+
+另一条路是走本地 CONNECT 代理（仓库外 `.tmp-ssh/proxy.mjs`，已被 gitignore），
+把连接强制转到可用 IP：
 
 ```bash
 node .tmp-ssh/proxy.mjs                                  # 另开一个终端
 git -c http.proxy=http://127.0.0.1:7899 push origin main
 ```
 
-另外这台机器上 `git` 的 `http.sslBackend` 是 `schannel` 时会报
+还有一点：这台机器上 `git` 的 `http.sslBackend` 是 `schannel` 时会报
 `schannel: AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS`，
 需要 `git -c http.sslBackend=openssl`（或 `git config --global http.sslBackend openssl` 永久改掉）。
 
