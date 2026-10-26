@@ -13,7 +13,7 @@ export default function Add() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useToast();
-  const { accounts, categories, transactions } = useLedger();
+  const { accounts, categories, transactions, loading } = useLedger();
 
   const editing = id ? transactions.find((t) => t.id === id) : undefined;
 
@@ -26,8 +26,32 @@ export default function Add() {
   const [note, setNote] = useState(editing?.note ?? '');
   const [tagsText, setTagsText] = useState(editing?.tags.join(' ') ?? '');
   const [busy, setBusy] = useState(false);
+  // 编辑模式下，进页面时账目可能还在从 IndexedDB 读；读到之前不能算初始化完成
+  const [formSeeded, setFormSeeded] = useState(false);
 
   const liveAccounts = useMemo(() => accounts.filter((a) => !a.archived), [accounts]);
+
+  // 数据到齐后回填表单（直接打开 /edit/xxx 或刷新页面时，首帧 editing 是 undefined）
+  useEffect(() => {
+    if (formSeeded) return;
+    if (id && loading) return; // 还在读，等等
+    if (id && !editing) {
+      // 读完了却找不到这条记录，说明已被删除
+      setFormSeeded(true);
+      return;
+    }
+    if (editing) {
+      setType(editing.type);
+      setAmountText((editing.amount / 100).toFixed(2));
+      setCategoryId(editing.categoryId);
+      setAccountId(editing.accountId);
+      setToAccountId(editing.toAccountId);
+      setDate(editing.date);
+      setNote(editing.note);
+      setTagsText(editing.tags.join(' '));
+    }
+    setFormSeeded(true);
+  }, [id, loading, editing, formSeeded]);
 
   useEffect(() => {
     if (!accountId && liveAccounts.length > 0) setAccountId(liveAccounts[0].id);
@@ -46,6 +70,8 @@ export default function Add() {
 
   const cents = parseAmountToCents(amountText) ?? 0;
   const canSubmit = cents > 0 && !!accountId && (type === 'transfer' ? !!toAccountId && toAccountId !== accountId : !!categoryId);
+  // 带着 id 进来但数据读完仍找不到 -> 这条记录已经被删掉了
+  const missing = !!id && !loading && !editing;
 
   function press(key: string) {
     if (key === 'OK') return;
@@ -65,7 +91,7 @@ export default function Add() {
   }
 
   async function submit() {
-    if (!canSubmit || busy) return;
+    if (!canSubmit || busy || missing) return;
     setBusy(true);
     try {
       const draft = {
@@ -105,8 +131,10 @@ export default function Add() {
     <div className="add-page">
       <div className="page-head">
         <div>
-          <h1 className="page-title">{editing ? '修改记录' : '记一笔'}</h1>
-          <div className="page-sub">{date === toDateKey(new Date()) ? '今天' : date}</div>
+          <h1 className="page-title">{missing ? '记录不存在' : editing ? '修改记录' : '记一笔'}</h1>
+          <div className="page-sub">
+            {missing ? '这条记录可能已经被删除了' : date === toDateKey(new Date()) ? '今天' : date}
+          </div>
         </div>
         {editing ? (
           <button className="btn danger" onClick={remove}>
@@ -116,6 +144,17 @@ export default function Add() {
         ) : null}
       </div>
 
+      {missing ? (
+        <div className="card empty">
+          <span className="emoji">🔍</span>
+          找不到这条记录
+          <button className="btn" style={{ marginTop: 14 }} onClick={() => navigate('/')}>
+            回到总览
+          </button>
+        </div>
+      ) : !formSeeded ? (
+        <div className="empty">正在读取…</div>
+      ) : (
       <div className="add-layout">
         <div>
           <div className="segmented">
@@ -239,6 +278,7 @@ export default function Add() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

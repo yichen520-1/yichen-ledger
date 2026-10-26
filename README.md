@@ -95,18 +95,21 @@ npm run electron
 
 ### 自检脚本
 
-仓库里带了两个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
+仓库里带了三个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
 
 ```bash
 npm run build
 npx vite preview --port 4173 &      # 先起一个静态服务
 node scripts/smoke.mjs              # 用真实 Chrome 走一遍记账流程并截图到 .shots/
+node scripts/flows.mjs              # 深流程：预算超支、建账户、改账目、建分类、持久化
 
 # 或者验证桌面端（Electron 直接加载 dist/index.html）
 node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edata scripts/electron-check.cjs
 ```
 
 `scripts/smoke.mjs` 会：打开首页 → 输入金额 → 选分类 → 保存 → 回首页确认 → 遍历统计/预算/我的/账户/分类 → 桌面宽度再截一轮，任何控制台报错都会让脚本以非 0 退出。
+
+`scripts/flows.mjs` 会：新建总预算 → 记一笔 1500 元把钱花超 → 断言进度条变红 → 新建账户 → 点首页的账目进编辑页改金额 → 新建分类 → 刷新页面确认 IndexedDB 里数据还在。
 
 ## 打包到各平台
 

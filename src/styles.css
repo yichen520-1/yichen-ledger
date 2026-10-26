@@ -621,10 +621,10 @@ textarea {
 /* 图表 */
 .chart {
   width: 100%;
-  /* viewBox 是 320x150 且 preserveAspectRatio="none"，
-     宽屏下会被纵向拉很高，这里限制高度并让内容居中 */
-  height: 190px;
-  max-height: 34vh;
+  /* viewBox 是 320x110 且 preserveAspectRatio="none"，
+     宽屏下会被纵向拉很高，这里限制高度 */
+  height: 150px;
+  max-height: 30vh;
   overflow: visible;
   display: block;
 }
@@ -632,6 +632,25 @@ textarea {
 .chart text {
   fill: var(--text-faint);
   font-size: 10px;
+}
+
+/* 柱子下面的月份 / 金额行：用 HTML 排版，避免 SVG 被拉伸时把字也拉变形 */
+.chart-axis {
+  display: grid;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.chart-axis .m {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.chart-axis .v {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* 日历热力图 */

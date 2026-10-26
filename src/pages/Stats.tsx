@@ -42,7 +42,9 @@ export default function Stats() {
     });
   }, [month, transactions]);
   const maxDay = Math.max(1, ...days.map((d) => d.amount));
-  const avg = totals.expense / daysInMonth(month);
+  // 当月的「日均」要按已经过去的天数算，否则月初会显得花得很少
+  const elapsedDays = month === currentMonthKey() ? new Date().getDate() : daysInMonth(month);
+  const avg = totals.expense / Math.max(1, elapsedDays);
 
   // 每一天的支出占最大值的比例 -> 用 5 档色阶
   const heatColor = (amount: number): string => {
@@ -102,9 +104,14 @@ export default function Stats() {
 
       <div className="section-title">近 6 个月趋势</div>
       <section className="card">
-        <svg className="chart" viewBox="0 0 320 150" preserveAspectRatio="none" role="img" aria-label="近六个月收支趋势">
+        {/*
+          柱子用 SVG 画（preserveAspectRatio="none" 才能随宽度自由拉伸），
+          但文字不能放在里面 —— 非等比缩放会把字压扁或拉宽。
+          所以月份和金额改成下面的 HTML 行来排版。
+        */}
+        <svg className="chart" viewBox="0 0 320 110" preserveAspectRatio="none" role="img" aria-label="近六个月收支趋势">
           {[0, 1, 2, 3].map((i) => {
-            const y = 10 + (i * 100) / 3;
+            const y = 6 + (i * 100) / 3;
             return (
               <line key={i} x1="0" x2="320" y1={y} y2={y} stroke="var(--line)" strokeWidth="0.6" strokeDasharray="2 3" />
             );
@@ -116,18 +123,20 @@ export default function Stats() {
             const hInc = (t.income / maxTrend) * 100;
             return (
               <g key={t.month}>
-                <rect x={i * w + w / 2 - bw - 2} y={110 - hExp} width={bw} height={Math.max(1, hExp)} rx="3" fill="#ef8a4b" />
-                <rect x={i * w + w / 2 + 2} y={110 - hInc} width={bw} height={Math.max(1, hInc)} rx="3" fill="#4cc38a" opacity="0.85" />
-                <text x={i * w + w / 2} y={127} textAnchor="middle">
-                  {Number(t.month.slice(5))}月
-                </text>
-                <text x={i * w + w / 2} y={142} textAnchor="middle" style={{ fontSize: 9 }}>
-                  {formatCentsCompact(t.expense)}
-                </text>
+                <rect x={i * w + w / 2 - bw - 2} y={106 - hExp} width={bw} height={Math.max(1, hExp)} rx="3" fill="#ef8a4b" />
+                <rect x={i * w + w / 2 + 2} y={106 - hInc} width={bw} height={Math.max(1, hInc)} rx="3" fill="#4cc38a" opacity="0.85" />
               </g>
             );
           })}
         </svg>
+        <div className="chart-axis" style={{ gridTemplateColumns: `repeat(${trend.length}, 1fr)` }}>
+          {trend.map((t) => (
+            <div key={t.month}>
+              <div className="m">{Number(t.month.slice(5))}月</div>
+              <div className="v">{t.expense > 0 ? formatCentsCompact(t.expense) : '—'}</div>
+            </div>
+          ))}
+        </div>
         <div className="heat-legend">
           <span>
             <i style={{ background: '#ef8a4b' }} /> 支出
