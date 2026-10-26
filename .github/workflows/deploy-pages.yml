@@ -1,0 +1,67 @@
+name: Deploy web version to GitHub Pages
+
+# 把构建产物发布到 GitHub Pages，得到一个任何设备都能直接打开的网址：
+#   https://yichen520-1.github.io/yichen-ledger/
+# iPhone / Android 打开后点「添加到主屏幕」，就会像 App 一样全屏运行，
+# 而且没有网络也能用（数据在本机 IndexedDB，静态资源由 Service Worker 缓存）。
+#
+# 这样即使暂时没有 Mac 去编译 iOS 包，Apple 设备上也照样能用。
+
+on:
+  push:
+    branches: [main]
+  # 允许在 Actions 页面手动点一下重新发布
+  workflow_dispatch:
+
+# 只保留最新一次部署，避免排队
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 跑单元测试
+        run: npm test
+
+      - name: 构建
+        # base 用相对路径（vite.config.ts 里的 './'），所以放在
+        # /yichen-ledger/ 这样的子路径下也不用手动改配置
+        run: npm run build
+
+      - name: 关掉 Jekyll
+        # 不加这个，GitHub Pages 会忽略下划线开头的文件，
+        # 构建产物里目前没有这类文件，但加上更保险
+        run: touch dist/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
