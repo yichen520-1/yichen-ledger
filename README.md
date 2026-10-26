@@ -76,7 +76,6 @@
 ```bash
 # 安装依赖
 npm install
-
 # 浏览器里开发（http://localhost:5173）
 npm run dev
 
@@ -110,6 +109,24 @@ node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edat
 `scripts/smoke.mjs` 会：打开首页 → 输入金额 → 选分类 → 保存 → 回首页确认 → 遍历统计/预算/我的/账户/分类 → 桌面宽度再截一轮，任何控制台报错都会让脚本以非 0 退出。
 
 `scripts/flows.mjs` 会：新建总预算 → 记一笔 1500 元把钱花超 → 断言进度条变红 → 新建账户 → 点首页的账目进编辑页改金额 → 新建分类 → 刷新页面确认 IndexedDB 里数据还在。
+
+### 推送代码时如果连不上 GitHub
+
+这台机器上 `github.com` 的 DNS 有时会解析到 `20.205.243.166`，该地址的 443 端口不通，
+表现为 `Failed to connect to github.com:443` 或 `Connection was reset`。
+`140.82.112.4` / `140.82.116.4` 是可用的。
+
+`hosts` 文件需要管理员权限才能改，所以仓库外（`.tmp-ssh/`，已被 gitignore）留了一个
+本地 CONNECT 代理，把连接强制转到可用 IP：
+
+```bash
+node .tmp-ssh/proxy.mjs                                  # 另开一个终端
+git -c http.proxy=http://127.0.0.1:7899 push origin main
+```
+
+另外这台机器上 `git` 的 `http.sslBackend` 是 `schannel` 时会报
+`schannel: AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS`，
+需要 `git -c http.sslBackend=openssl`（或 `git config --global http.sslBackend openssl` 永久改掉）。
 
 ## 打包到各平台
 
