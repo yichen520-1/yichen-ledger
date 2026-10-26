@@ -132,15 +132,32 @@ git -c http.proxy=http://127.0.0.1:7899 push origin main
 
 ### Windows / macOS（Electron）
 
+已经接好 `electron-builder`，配置在 [electron-builder.config.cjs](electron-builder.config.cjs)：
+
 ```bash
-npm run build
-npx electron-builder --win   # Windows
-npx electron-builder --mac   # macOS（需在 macOS 上执行）
+npm run pack:win     # Windows：NSIS 安装包 + 免安装 zip
+npm run pack:mac     # macOS：dmg（需在 macOS 上执行）
+npm run pack:dir     # 只解包不打包，用来快速验证
 ```
 
-> 仓库里还没有 `electron-builder` 依赖和 `build` 配置，第一次打包前需要
-> `npm i -D electron-builder` 并在 package.json 里补 `build.files` / `build.appId`。
-> 这一步留给你按发布渠道（安装包 or 免安装 zip）自己定。
+图标由 `scripts/make-icon.py` 生成（用微软雅黑渲染「忆」字），
+改图标就改这个脚本再跑一次，或用 `npm run make:icon`：
+
+```bash
+python scripts/make-icon.py
+```
+
+产物结构：`忆尘记账 Setup 0.1.0.exe`（约 87 MB，可选安装目录）、
+`忆尘记账-0.1.0-win.zip`（免安装，约 111 MB）。
+
+> **排坑：输出目录不能带中文。** NSIS 生成卸载程序时会执行一次自己产出的
+> 安装包，如果**目录路径**里有中文（比如本项目就放在 `D:\Desktop\忆尘记账`），
+> 这一步会直接失败并报 `process failed 2`。配置里已经做了处理：
+> 检测到路径含非 ASCII 字符就自动把产物输出到系统临时目录
+> （`%TEMP%\yichen-ledger-release`）。文件名带中文没问题，只有路径有影响。
+
+> 没有代码签名证书，所以安装时 Windows SmartScreen 会提示「未知发布者」，
+> 点「更多信息 → 仍要运行」即可。要消掉这个提示需要购买代码签名证书。
 
 ### Android（Capacitor）
 
