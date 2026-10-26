@@ -244,6 +244,36 @@ npx cap open ios         # 在 Xcode 里运行 / 打包
 > 上架 App Store 还需要 Apple 开发者账号（$99/年）配置签名，
 > 只想自己用的话用免费个人账号装到自己的设备上就行（7 天要重签一次）。
 
+### 让 CI 帮你出全平台安装包
+
+在一台 Windows 机器上做不出 macOS 的 dmg，也编译不了 iOS 的 ipa。
+[.github/workflows/build-installers.yml](.github/workflows/build-installers.yml)
+把这一步交给 GitHub Actions —— 它三种系统的 runner 都有：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+推一个 `v*` 的 tag 就会并行跑五个任务，然后建一个 Release，把产物挂上去：
+
+| 任务 | 运行环境 | 产物 |
+| --- | --- | --- |
+| windows | `windows-latest` | NSIS 安装包 + 免安装 zip |
+| macos | `macos-latest` | dmg（arm64 + x64） |
+| linux | `ubuntu-latest` | AppImage |
+| android | `ubuntu-latest` + JDK 21 | `app-debug.apk` |
+| ios | `macos-latest` + CocoaPods | 未签名 ipa |
+
+也可以去 Actions 页面手动 `Run workflow`，那样只留 artifact 不建 Release。
+
+> **iOS 的包是未签名的。** 没有 Apple 开发者证书，`xcodebuild` 只能出
+> `CODE_SIGNING_ALLOWED=NO` 的产物，iPhone 上直接装不了。拿到后用
+> SideStore / Sideloadly 这类工具在本地重签，或者干脆把 `ios/App` 拖进
+> Xcode 用你自己的免费账号跑一次真机。
+>
+> Android 用的是模板自带的 debug keystore，自用没问题，上架要换正式签名。
+
 ---
 
 ## 网页版部署（GitHub Pages）

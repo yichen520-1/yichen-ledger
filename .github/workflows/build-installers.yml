@@ -1,0 +1,220 @@
+name: Build desktop and mobile installers
+
+# 这台开发机是 Windows，做不出 macOS 的 dmg，也编译不了 iOS 的 ipa。
+# GitHub Actions 恰好三个 runner 都有（windows / macos / ubuntu），
+# 所以把「打安装包」这件事交给 CI：推一个 v* 的 tag 就自动出全套。
+#
+# 产物：
+#   Windows  → NSIS 安装包 + 免安装 zip
+#   macOS    → dmg（arm64 与 x64 各一个）
+#   Linux    → AppImage
+#   Android  → debug 签名的 apk（能直接装，适合自用）
+#   iOS      → 未签名的 ipa（签名必须在本地用 Apple 账号做，见 README）
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------- Windows
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 跑单元测试
+        run: npm test
+
+      - name: 打包
+        # NSIS 默认从 GitHub 拉工具链，国内网络不稳，换成镜像
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+        run: npm run pack:win
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            release/*.exe
+            release/*.zip
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ macOS
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 打包 dmg
+        # 两个架构都出：Apple 芯片用 arm64，Intel 老机器用 x64。
+        # 配置里 identity: null，跳过签名 —— 没有 Apple 开发者证书，
+        # 用户第一次打开要在「系统设置 → 隐私与安全性」里点「仍要打开」。
+        run: npm run pack:mac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: release/*.dmg
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ Linux
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 打包 AppImage
+        run: npm run build && npx electron-builder --linux --config electron-builder.config.cjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: release/*.AppImage
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------- Android
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # Capacitor 7 的 Android 模板要求 JDK 21
+          java-version: 21
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建 web 产物并同步进原生工程
+        # cap sync 会把 dist/ 整个复制到 android/app/src/main/assets/public，
+        # 所以必须先 build，否则它找不到 webDir 会直接报错
+        run: npm run build && npx cap sync android
+
+      - name: 编译 APK
+        # debug 签名是 Capacitor 模板自带的那把 debug keystore，
+        # 自己装着用没问题；要上架应用商店得换成正式签名。
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------- iOS
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建 web 产物并同步进 Xcode 工程
+        run: npm run build && npx cap sync ios
+
+      - name: 装 CocoaPods 依赖
+        run: cd ios/App && pod install --repo-update
+
+      - name: 编译未签名 ipa
+        # 没有 Apple 开发者证书，只能出「未签名」的包。
+        # 拿到之后用 SideStore / Sideloadly 这类工具在本地重签才能装，
+        # 或者把工程拖进 Xcode 用你自己的账号跑一次真机。
+        run: |
+          cd ios/App
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            archive
+
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/Payload/"
+          cd "$RUNNER_TEMP"
+          zip -qry "$GITHUB_WORKSPACE/yichen-ledger-unsigned.ipa" Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: yichen-ledger-unsigned.ipa
+          if-no-files-found: error
+
+  # --------------------------------------------------------------- 汇总发布
+  release:
+    # 只有打 tag 的时候才建 Release；手动触发就只留 artifact
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, macos, linux, android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+
+      - name: 把各平台产物摊平到一层
+        run: |
+          mkdir -p out
+          find dist-artifacts -type f \( -name '*.exe' -o -name '*.zip' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.apk' -o -name '*.ipa' \) -exec cp {} out/ \;
+          ls -lh out
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          draft: false
+          generate_release_notes: true
+          body: |
+            忆尘记账 ${{ github.ref_name }}
+
+            | 平台 | 文件 |
+            | --- | --- |
+            | Windows | `忆尘记账 Setup *.exe`（安装版）、`*-win.zip`（免安装） |
+            | macOS | `*.dmg`（arm64 = Apple 芯片，x64 = Intel） |
+            | Linux | `*.AppImage` |
+            | Android | `app-debug.apk` |
+            | iOS | `yichen-ledger-unsigned.ipa`（未签名，需自行重签） |
+
+            网页版：<https://yichen520-1.github.io/yichen-ledger/>
