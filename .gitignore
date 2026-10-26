@@ -6,11 +6,15 @@ node_modules/
 dist/
 dist-electron/
 release/
+out/
 *.tsbuildinfo
+
+# 打包中间产物（build/ 里的图标要提交，只忽略产物）
 build/*.zip
 build/*.dmg
 build/*.exe
 build/*.AppImage
+build/_icon64.png
 
 # 原生工程（由 `npx cap add` 生成，可按需重新生成）
 android/

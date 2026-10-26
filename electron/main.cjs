@@ -1,10 +1,13 @@
 // Electron 主进程（Windows / macOS 桌面端）
 // 用 CommonJS 是因为 Electron 的主进程默认按 CJS 加载。
-const { app, BrowserWindow, shell, Menu } = require('electron');
+const { app, BrowserWindow, shell, Menu, nativeTheme } = require('electron');
 const path = require('node:path');
 
 const isDev = !app.isPackaged;
 const DEV_URL = 'http://localhost:5173';
+
+// 界面是深色的，系统主题也跟着深色走，避免 Windows 上标题栏是亮色
+nativeTheme.themeSource = 'dark';
 
 let mainWindow = null;
 
@@ -59,6 +62,10 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
+    // Windows 上设成深色，标题栏才不是刺眼的白色（macOS 由系统控制）
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('com.yichen.ledger');
+    }
     createWindow();
 
     app.on('activate', () => {
