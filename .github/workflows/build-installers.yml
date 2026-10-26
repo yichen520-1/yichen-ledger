@@ -90,7 +90,7 @@ jobs:
         run: npm ci
 
       - name: 打包 AppImage
-        run: npm run build && npx electron-builder --linux --config electron-builder.config.cjs
+        run: npm run pack:linux
 
       - uses: actions/upload-artifact@v4
         with:
