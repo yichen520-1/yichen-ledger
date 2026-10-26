@@ -140,7 +140,7 @@ npm run electron
 
 ### 自检脚本
 
-仓库里带了四个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
+仓库里带了五个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
 
 ```bash
 npm run build
@@ -148,6 +148,7 @@ npx vite preview --port 4173 &      # 先起一个静态服务
 node scripts/smoke.mjs              # 用真实 Chrome 走一遍记账流程并截图到 .shots/
 node scripts/flows.mjs              # 深流程：预算超支、建账户、改账目、建分类、持久化
 node scripts/pwa-check.mjs          # 网页版：manifest、图标、SW 缓存、断网后还能打开
+node scripts/live-check.mjs         # 直接打线上 Pages 地址，端到端验证线上那份能用
 
 # 或者验证桌面端（Electron 直接加载 dist/index.html）
 node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edata scripts/electron-check.cjs
@@ -158,6 +159,8 @@ node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edat
 `scripts/flows.mjs` 会：新建总预算 → 记一笔 1500 元把钱花超 → 断言进度条变红 → 新建账户 → 点首页的账目进编辑页改金额 → 新建分类 → 刷新页面确认 IndexedDB 里数据还在。
 
 `scripts/pwa-check.mjs` 会：断言 manifest 能被解析且 display 是 standalone → 四个图标都能下载 → Service Worker 进入 `activated` → 缓存里真的有 index.html 和带 hash 的 JS → **切到离线模式后刷新，页面照样能打开**。最后一项是网页版能不能「装到主屏当 App 用」的关键。
+
+`scripts/live-check.mjs` 不走本地，直接打开 <https://yichen520-1.github.io/yichen-ledger/>：记一笔 66.66 元、断言净资产跟着变、四个子页面都能渲染、SW 已注册、没有控制台错误。用来确认**部署上去的那一份**（而不是本地 dist）真的可用。发布之后跑一次最踏实。
 
 ### 推送代码时如果连不上 GitHub
 
