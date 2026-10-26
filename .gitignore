@@ -29,6 +29,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Python 生成图标时产生的字节码缓存
+__pycache__/
+*.pyc
+
 # 编辑器 / 系统
 .vscode/
 .idea/
