@@ -28,8 +28,8 @@
 > **安装路径是英文，界面上是中文。** 装好之后程序在
 > `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe`，
 > .app 叫 `yichen-ledger.app`，Linux 的可执行文件也是 `yichen-ledger` ——
-> 全是纯 ASCII，避免非 ASCII 路径在安装器里翻车；
-> 而窗口标题、开始菜单 / 桌面快捷方式、macOS 启动台与 Dock、
+> 全是纯 ASCII，省得非 ASCII 名字在安装脚本、注册表、命令行参数里各走一遍
+> 转码；而窗口标题、开始菜单 / 桌面快捷方式、macOS 启动台与 Dock、
 > 控制面板里的名字仍然显示「忆尘记账」。详见下方
 > [「为什么程序名是英文、界面是中文」](#为什么程序名是英文界面是中文)。
 
@@ -243,11 +243,18 @@ python scripts/make-icon.py
 产物结构：`yichen-ledger-0.1.1-win-x64.exe`（约 88 MB，可选安装目录）、
 `yichen-ledger-0.1.1-win-x64.zip`（免安装，约 112 MB）。
 
-> **排坑：输出目录不能带中文。** NSIS 生成卸载程序时会执行一次自己产出的
-> 安装包，如果**目录路径**里有中文（比如本项目就放在 `D:\Desktop\忆尘记账`），
-> 这一步会直接失败并报 `process failed 2`。配置里已经做了处理：
-> 检测到路径含非 ASCII 字符就自动把产物输出到系统临时目录
-> （`%TEMP%\yichen-ledger-release`），代码见配置里的 `resolveOutput()`。
+> **排坑：别在项目目录里跑产出的安装包。** NSIS 生成卸载程序时会执行一次
+> 自己产出的安装包。如果安装包就躺在项目目录里（比如
+> `D:\Desktop\忆尘记账\release\`），这一步会退出码 2、弹
+> `Failed to uninstall old application files`、一个文件都不装。配置里因此把
+> 产物输出到系统临时目录（`%TEMP%\yichen-ledger-release`），代码见配置里的
+> `resolveOutput()`。
+>
+> 这条最初被记成「中文路径」的锅，后来做了对照实验才知道不准确：同样的中文
+> 路径放到项目目录之外（`D:\Desktop\忆尘记账安装测试\忆尘记账 Setup.exe`）
+> 安装一切正常，而项目目录内的纯 ASCII 子目录照样失败。差别在那个目录本身的
+> 环境，不在名字。把链路改成 ASCII 仍然值得保留 —— 它是稳妥的默认姿势 ——
+> 但它不是那次报错的根因。
 
 > **排坑：界面上的版本号是手写的。** 界面底部和「我的 → 关于」原来写死了
 > `v0.1.0`，发 0.1.1 时忘了改，装好的新版本还显示旧版本号。现在
@@ -264,12 +271,18 @@ productName: '忆尘记账',        // 窗口标题、快捷方式、启动台�
 executableName: 'yichen-ledger', // 程序目录名、可执行文件名 —— 必须是纯 ASCII
 ```
 
-分开的理由不是洁癖，是踩出来的：NSIS 安装包只要**安装包自身所在的路径**或
-**用户选的目标安装目录**含非 ASCII 字符，就会直接退出码 2、一个文件都不装。
-之前把 `productName` 当文件名用时，安装目录是
-`%LOCALAPPDATA%\Programs\忆尘记账`，用户把安装包放在中文文件夹里双击就装不上。
-改成 ASCII 之后，默认目录是 `%LOCALAPPDATA%\Programs\yichen-ledger`，
-安装包放在哪都能装。
+分开的理由不是洁癖，是踩出来的：一开始把 `productName` 当文件名用，安装目录
+是 `%LOCALAPPDATA%\Programs\忆尘记账`，程序叫 `忆尘记账.exe`，卸载器叫
+`Uninstall 忆尘记账.exe`。这些名字要经过 NSIS 脚本、注册表、快捷方式、
+命令行参数好几道手，任何一道对非 ASCII 处理不当都会炸，而且排查起来很难。
+把「用户看到什么」和「文件叫什么」拆开之后，这条链路上再没有编码可言。
+
+（补充一句实证过的结论：**中文路径本身不会导致安装失败**。同一台机器上，
+把安装包放在 `D:\Desktop\忆尘记账安装测试\忆尘记账 Setup 0.1.1.exe` 里双击，
+装到 `%LOCALAPPDATA%\Programs\yichen-ledger` 一切正常；目标目录特意指定成
+`%LOCALAPPDATA%\Programs\忆尘记账中文测试` 也能装。所以拆开名字是为了减少
+变量、而不是在修一个「中文路径装不上」的 bug。真正会炸的是另一件事：**别在
+项目目录里跑产出的安装包**，见上文那条排坑。）
 
 各平台落地情况：
 
