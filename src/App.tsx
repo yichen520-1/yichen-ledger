@@ -54,7 +54,7 @@ function Shell() {
         </NavLink>
         <div style={{ flex: 1 }} />
         <div className="muted" style={{ padding: '0 12px', fontSize: 11.5 }}>
-          v0.1.0 · 本地优先
+          v{__APP_VERSION__} · 本地优先
         </div>
       </aside>
 

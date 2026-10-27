@@ -164,7 +164,7 @@ export default function SettingsPage() {
         <div className="row" style={{ alignItems: 'flex-start', gap: 12 }}>
           <div className="brand-mark">忆</div>
           <div className="grow">
-            <div style={{ fontWeight: 600 }}>忆尘记账 v0.1.0</div>
+            <div style={{ fontWeight: 600 }}>忆尘记账 v{__APP_VERSION__}</div>
             <div className="muted" style={{ marginTop: 4 }}>
               本地优先的个人记账应用，同一套代码运行在 Android、iOS、Windows 和 macOS 上。
               所有金额以「分」为整数存储，不会有小数误差。
