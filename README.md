@@ -432,6 +432,21 @@ git push origin v0.2.0
 
 也可以去 Actions 页面手动 `Run workflow`，那样只留 artifact 不建 Release。
 
+### 发版说明写在仓库里
+
+Release 页面上那一大段中文说明不在 workflow 里，而是在
+[`docs/releases/`](docs/releases/) 目录下，文件名就是 tag 名：
+
+```bash
+# 例：写 v0.2.0 的说明
+docs/releases/v0.2.0.md
+```
+
+打 tag 之前先把说明写好提交，`release` 任务会去找
+`docs/releases/<tag>.md` 并作为 Release 正文；找不到就退回一段通用说明
+（不会因为少写文档而让发布失败）。这样做的好处是：说明可以单独 review、
+可以改、可以留着给下个版本抄结构，不用在一堆 YAML 里写长文。
+
 > **产物文件名是纯 ASCII。** GitHub 会把 Release 资产名里的非 ASCII 字符
 > 统统替换成 `.`（`忆尘记账 Setup 0.1.0.exe` 会变成 `Setup.0.1.0.exe`），
 > 所以 `electron-builder.config.cjs` 里给三端都设了 `artifactName`，
