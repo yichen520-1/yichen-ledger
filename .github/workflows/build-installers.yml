@@ -43,6 +43,21 @@ jobs:
           ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
         run: npm run pack:win
 
+      - name: 核对可执行文件名是英文、显示名是中文
+        # 磁盘上必须是 yichen-ledger.exe（纯 ASCII，NSIS 才不会在
+        # 非 ASCII 路径上翻车）；窗口标题/快捷方式名来自 productName
+        # 与 nsis.shortcutName，仍然是「忆尘记账」。
+        shell: pwsh
+        run: |
+          $exe = 'release\win-unpacked\yichen-ledger.exe'
+          if (-not (Test-Path $exe)) { throw "缺少 $exe" }
+          $v = (Get-Item $exe).VersionInfo
+          "文件名: $([System.IO.Path]::GetFileName($exe))"
+          "FileDescription: $($v.FileDescription)"
+          "ProductName:     $($v.ProductName)"
+          "FileVersion:     $($v.FileVersion)"
+          if ($v.FileDescription -ne '忆尘记账') { throw "FileDescription 不是中文显示名" }
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
@@ -70,6 +85,23 @@ jobs:
         # 用户第一次打开要在「系统设置 → 隐私与安全性」里点「仍要打开」。
         run: npm run pack:mac
 
+      - name: 核对 .app 目录名是英文、显示名是中文
+        # 这一条是给「程序名 ASCII / 显示名中文」这个约定留证据的：
+        # 目录名必须落在 yichen-ledger.app，而 Info.plist 里的
+        # CFBundleName / CFBundleDisplayName 必须是「忆尘记账」。
+        # Finder、启动台、Dock、活动监视器显示的都是后两者。
+        run: |
+          for app in release/mac*/*.app; do
+            echo "== $app"
+            /usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$app/Contents/Info.plist"
+            /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$app/Contents/Info.plist"
+            /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist"
+          done
+          # 两个架构的 .app 目录名都必须是 ASCII 的 yichen-ledger.app，
+          # 任何一个不是这里就会红，防止以后改配置改坏。
+          test -d 'release/mac-arm64/yichen-ledger.app'
+          test -d 'release/mac/yichen-ledger.app'
+
       - uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
@@ -91,6 +123,24 @@ jobs:
 
       - name: 打包 AppImage
         run: npm run pack:linux
+
+      - name: 核对可执行文件名是英文、桌面条目是中文
+        # Linux 下「用户看到的名字」来自 .desktop 文件的 Name= 字段，
+        # 而磁盘上的可执行文件与 AppImage 目录名走 executableName。
+        # 这里把两边都打出来，保证「英文文件名 + 中文显示名」没走样。
+        # --appimage-extract 不需要 FUSE，CI 容器里也能跑。
+        run: |
+          for img in release/*.AppImage; do
+            echo "== $img"
+            chmod +x "$img"
+            "./$img" --appimage-extract >/dev/null 2>&1 || true
+          done
+          if [ -d squashfs-root ]; then
+            echo "-- .desktop 里的 Name（用户看到的名字）"
+            grep -h '^Name=' squashfs-root/*.desktop || echo "(没找到 .desktop)"
+            echo "-- 磁盘上的可执行文件（应当是 ASCII）"
+            find squashfs-root -maxdepth 1 -type f ! -name '*.desktop' ! -name '*.png' ! -name 'AppRun' -printf '%f\n' || true
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -129,6 +179,22 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
+
+      - name: 核对包名、版本号与中文应用名
+        # 安卓这边「用户看到的名字」是 launcher 上的 application-label，
+        # 它来自 strings.xml 的 app_name（中文），跟磁盘上的文件名无关。
+        # 顺手把 versionName 也验一遍，防止发版忘了升版本号。
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/debug/app-debug.apk
+          AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt | sort -V | tail -1)
+          echo "aapt: $AAPT"
+          "$AAPT" dump badging "$apk" > /tmp/badging.txt
+          head -1 /tmp/badging.txt
+          want=$(node -p "require('./package.json').version")
+          echo "package.json 版本: $want"
+          grep -q "versionName='$want'" /tmp/badging.txt && echo "versionName OK" || { echo "versionName 对不上"; exit 1; }
+          grep -q "application-label:'忆尘记账'" /tmp/badging.txt && echo "应用显示名 OK（中文）" || { echo "应用显示名不是中文"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:
@@ -182,6 +248,18 @@ jobs:
           cp -R "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/Payload/"
           cd "$RUNNER_TEMP"
           zip -qry "$GITHUB_WORKSPACE/yichen-ledger-unsigned.ipa" Payload
+
+      - name: 核对 .app 目录名是英文、桌面名是中文
+        # 和 macOS 一样：磁盘上 App.app（纯 ASCII，Xcode 的 TARGET_NAME），
+        # 主屏上显示的是 Info.plist 里的 CFBundleDisplayName「忆尘记账」。
+        run: |
+          app="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          test -d "$app" || { echo "找不到 $app"; exit 1; }
+          echo "目录名: $(basename "$app")"
+          echo -n "CFBundleDisplayName: "
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$app/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$app/Info.plist")" = "忆尘记账" \
+            || { echo "显示名不是中文"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:

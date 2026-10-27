@@ -285,6 +285,19 @@ executableName: 'yichen-ledger', // 程序目录名、可执行文件名 —— 
 > `%APPDATA%\yichen-ledger`）。所以把可执行文件从 `忆尘记账.exe` 改成
 > `yichen-ledger.exe`，账本、设置、IndexedDB 全都原地不动。
 
+**这条约定不是靠人记住，是 CI 每次打包都验的。** 五个平台的任务在打包之后各加了一步
+「核对」，跑不过就让流水线红掉：
+
+| 平台 | CI 里核对什么 |
+| --- | --- |
+| Windows | `release\win-unpacked\yichen-ledger.exe` 存在，且 `FileDescription` 是「忆尘记账」 |
+| macOS | `release/mac-arm64/yichen-ledger.app` 与 `release/mac/yichen-ledger.app` 都存在，`CFBundleName` / `CFBundleDisplayName` 是「忆尘记账」 |
+| Linux | 解出 AppImage，`.desktop` 的 `Name=` 是「忆尘记账」，同目录下的可执行文件是 ASCII |
+| Android | `aapt dump badging` 的 `versionName` 等于 `package.json` 的版本，`application-label` 是「忆尘记账」 |
+| iOS | `App.app` 目录名是 ASCII，`CFBundleDisplayName` 是「忆尘记账」 |
+
+所以以后谁改配置改坏了，或者发版忘了升版本号，CI 会直接拦住。
+
 > 没有代码签名证书，所以安装时 Windows SmartScreen 会提示「未知发布者」，
 > 点「更多信息 → 仍要运行」即可。要消掉这个提示需要购买代码签名证书。
 
