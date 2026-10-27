@@ -9,8 +9,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // 和 package.json 的 version 保持一致。versionCode 每发一次版加一，
         // 否则新包装不到旧包上（Android 会报 INSTALL_FAILED_VERSION_DOWNGRADE）。
-        versionCode 3
-        versionName "0.1.2"
+        versionCode 4
+        versionName "0.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
