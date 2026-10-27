@@ -1,13 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#0f1216" />
-  <circle cx="32" cy="32" r="19" fill="none" stroke="#ffb454" stroke-width="4" />
+  <!-- 水墨版 favicon：宣纸底 + 焦墨「忆」+ 右下角一枚朱红小印。
+       真图标的飞白与远山放不进 16px，这里只留最认得出的三件事。 -->
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBF7EE" />
+      <stop offset="1" stop-color="#EDE5D6" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#paper)" />
   <text
-    x="32"
+    x="26"
     y="43"
-    font-family="PingFang SC, Microsoft YaHei, sans-serif"
-    font-size="26"
-    font-weight="700"
-    fill="#ffb454"
+    font-family="STXingkai, 华文行楷, KaiTi, 楷体, Xingkai SC, serif"
+    font-size="34"
+    font-weight="600"
+    fill="#141210"
     text-anchor="middle"
   >忆</text>
+  <!-- 印章：朱红边框 + 里面的「记」，小尺寸下就是一粒朱砂点。
+       落在右下角，和「忆」的末笔只轻轻挨着 —— 真印也是这样盖在字上的，
+       但不能压住笔画，16px 会糊成一团。 -->
+  <g transform="translate(45 42)">
+    <rect x="0" y="0" width="15" height="15" rx="1.1" fill="none" stroke="#C42C22" stroke-width="2.2" />
+    <text
+      x="7.5"
+      y="12"
+      font-family="SimSun, 宋体, serif"
+      font-size="10"
+      font-weight="700"
+      fill="#C42C22"
+      text-anchor="middle"
+    >记</text>
+  </g>
 </svg>
