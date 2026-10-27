@@ -7,6 +7,10 @@
 
 ![界面预览：桌面版总览与手机版总览、记一笔、统计](docs/screenshots/preview.png)
 
+| 应用图标 | 四端一致性 |
+| --- | --- |
+| ![忆尘记账的图标](docs/screenshots/icon.png) | ![Windows、Android、iOS、PWA 上的同一个图标](docs/screenshots/icon-platforms.png) |
+
 ---
 
 ## 📦 下载安装包
