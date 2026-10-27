@@ -3,7 +3,7 @@
 一个**本地优先**的个人记账应用：一套代码，同时运行在 **Android / iOS / Windows / macOS** 上。
 数据全部保存在你自己的设备里（IndexedDB），不经过任何服务器。
 
-> 当前版本 `v0.1.1`，功能可用，持续迭代中。
+> 当前版本 `v0.1.2`，功能可用，持续迭代中。
 
 ![界面预览：桌面版总览与手机版总览、记一笔、统计](docs/screenshots/preview.png)
 
@@ -17,11 +17,11 @@
 
 | 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows | `yichen-ledger-0.1.1-win-x64.exe` | 安装版，可选安装目录 |
-| Windows | `yichen-ledger-0.1.1-win-x64.zip` | 免安装，解压即用 |
-| macOS（Apple 芯片） | `yichen-ledger-0.1.1-mac-arm64.dmg` | M1/M2/M3/M4 |
-| macOS（Intel） | `yichen-ledger-0.1.1-mac-x64.dmg` | 老款 Mac |
-| Linux | `yichen-ledger-0.1.1-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
+| Windows | `yichen-ledger-0.1.2-win-x64.exe` | 安装版，可选安装目录 |
+| Windows | `yichen-ledger-0.1.2-win-x64.zip` | 免安装，解压即用 |
+| macOS（Apple 芯片） | `yichen-ledger-0.1.2-mac-arm64.dmg` | M1/M2/M3/M4 |
+| macOS（Intel） | `yichen-ledger-0.1.2-mac-x64.dmg` | 老款 Mac |
+| Linux | `yichen-ledger-0.1.2-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
 | Android | `app-debug.apk` | 手机浏览器下载后点安装 |
 | iOS | `yichen-ledger-unsigned.ipa` | **未签名**，需自行重签，见下方说明 |
 
@@ -233,15 +233,26 @@ npm run pack:mac     # macOS：dmg（需在 macOS 上执行）
 npm run pack:dir     # 只解包不打包，用来快速验证
 ```
 
-图标由 `scripts/make-icon.py` 生成（用微软雅黑渲染「忆」字），
-改图标就改这个脚本再跑一次，或用 `npm run make:icon`：
+图标是水墨风，画法写在 [`scripts/make_icon_common.py`](scripts/make_icon_common.py) 的
+`draw_icon()` 里，四端和网页共用同一份：米白宣纸底 + 三层远山（越近越浓）+
+山腰云气 + 右上角飞雁，焦墨行书「忆」压在正中，右下角盖一枚朱红「记」印。
 
 ```bash
-python scripts/make-icon.py
+npm run make:icon                       # Windows / macOS 图标 + Android + iOS
+python scripts/make-pwa-assets.py       # 网页版用的那几张 PNG
 ```
 
-产物结构：`yichen-ledger-0.1.1-win-x64.exe`（约 88 MB，可选安装目录）、
-`yichen-ledger-0.1.1-win-x64.zip`（免安装，约 112 MB）。
+> 两个细节是踩过坑才定下来的：山不能只有墨色渐变，`_mountain_layer()` 里
+> 必须再加一道山脊的浓墨线和一层「斧劈皴」的块面，否则远看只是一团灰雾；
+> 飞鸟的 `span` 是**整只鸟的翼展**，不是半翼展 —— 按半翼展算出来的鸟只有
+> 20 来像素，看整张图根本找不到。
+
+字体放在 [`assets/fonts/`](assets/fonts/)，都是 SIL OFL 1.1 授权（志莽行书用于
+「忆」，马善政毛笔楷书备用），只用来生成图标，不进安装包。印章上的「记」用
+宋体加粗后做刀刻处理 —— 本机没有篆书字体，篆书虽是印章正体，但装不上就算了。
+
+产物结构：`yichen-ledger-0.1.2-win-x64.exe`（约 88 MB，可选安装目录）、
+`yichen-ledger-0.1.2-win-x64.zip`（免安装，约 112 MB）。
 
 > **排坑：别在项目目录里跑产出的安装包。** NSIS 生成卸载程序时会执行一次
 > 自己产出的安装包。如果安装包就躺在项目目录里（比如
@@ -288,7 +299,7 @@ executableName: 'yichen-ledger', // 程序目录名、可执行文件名 —— 
 
 | 平台 | 磁盘上的名字 | 用户看到的名字 |
 | --- | --- | --- |
-| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆尘记账」，窗口标题「忆尘记账」，控制面板「忆尘记账 0.1.1」 |
+| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆尘记账」，窗口标题「忆尘记账」，控制面板「忆尘记账 0.1.2」 |
 | macOS | `/Applications/yichen-ledger.app` | Finder、启动台、Dock 显示「忆尘记账」（来自 `CFBundleName` / `CFBundleDisplayName`） |
 | Linux | `yichen-ledger` 可执行文件 + `*.AppImage` | 应用菜单里显示「忆尘记账」（`.desktop` 的 `Name`） |
 | Android / iOS | `com.yichen.ledger` | 桌面图标下的名字「忆尘记账」 |
@@ -390,8 +401,8 @@ npx cap open ios         # 在 Xcode 里运行 / 打包
 把这一步交给 GitHub Actions —— 它三种系统的 runner 都有：
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 推一个 `v*` 的 tag 就会并行跑五个任务，然后建一个 Release，把产物挂上去：
