@@ -3,7 +3,7 @@
 一个**本地优先**的个人记账应用：一套代码，同时运行在 **Android / iOS / Windows / macOS** 上。
 数据全部保存在你自己的设备里（IndexedDB），不经过任何服务器。
 
-> 当前版本 `v0.1.2`，功能可用，持续迭代中。
+> 当前版本 `v0.2.0`：新增设置中心、中/英/日三语、外观自定义与 iOS 手感动画。
 
 ![界面预览：桌面版总览与手机版总览、记一笔、统计](docs/screenshots/preview.png)
 
@@ -21,11 +21,11 @@
 
 | 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows | `yichen-ledger-0.1.2-win-x64.exe` | 安装版，可选安装目录 |
-| Windows | `yichen-ledger-0.1.2-win-x64.zip` | 免安装，解压即用 |
-| macOS（Apple 芯片） | `yichen-ledger-0.1.2-mac-arm64.dmg` | M1/M2/M3/M4 |
-| macOS（Intel） | `yichen-ledger-0.1.2-mac-x64.dmg` | 老款 Mac |
-| Linux | `yichen-ledger-0.1.2-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
+| Windows | `yichen-ledger-0.2.0-win-x64.exe` | 安装版，可选安装目录 |
+| Windows | `yichen-ledger-0.2.0-win-x64.zip` | 免安装，解压即用 |
+| macOS（Apple 芯片） | `yichen-ledger-0.2.0-mac-arm64.dmg` | M1/M2/M3/M4 |
+| macOS（Intel） | `yichen-ledger-0.2.0-mac-x64.dmg` | 老款 Mac |
+| Linux | `yichen-ledger-0.2.0-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
 | Android | `app-debug.apk` | 手机浏览器下载后点安装 |
 | iOS | `yichen-ledger-unsigned.ipa` | **未签名**，需自行重签，见下方说明 |
 
@@ -89,6 +89,12 @@
 - **预算**：按分类或全局设定月度上限；超支标红；支持「仅本月」和「每月重复」
 - **分类管理**：内置 21 个中式场景分类，可自定义图标与颜色
 - **数据**：JSON 完整备份 / 恢复、CSV 导出（Excel 能直接打开）、CSV 导入（缺的分类账户会自动建）
+- **设置中心**（v0.2.0）：通用 / 外观 / 数据 / 关于四组，语言、启动页、字号、配色、圆角一股脑收进来
+- **三语**（v0.2.0）：中文 / English / 日本語全量翻译，首次启动跟随系统语言，随时手动覆盖
+- **外观自定义**（v0.2.0）：侧边栏、主内容区、底部导航**三块各自独立**的壁纸；每块可调模糊、亮度、
+  对比度、饱和度、缩放、偏移、透明度、暗化、适配方式、水平翻转；外加全局字体风格、字号基准、
+  文字颜色、强调色、圆角、玻璃面板
+- **iOS 手感**（v0.2.0）：页面横向 push/pop、列表交错淡入、按下回弹、弹层阻尼，尊重系统的「减少动态效果」
 - **离线 & 隐私**：无网络依赖、无账号、无埋点
 
 ---
@@ -137,8 +143,8 @@
 
 ### 5. 平台特性
 - [ ] **生物识别锁**：Face ID / 指纹 / Windows Hello
-- [ ] **深色 / 浅色主题切换**（当前是深色优先）
-- [ ] **多语言**：至少中英双语
+- [x] **多语言**：中文 / 英文 / 日文（v0.2.0 已做）
+- [ ] **浅色主题**（当前是深色优先，但壁纸、配色、字体已经可以自定义）
 - [ ] **桌面端系统托盘常驻 + 开机自启**
 
 ---
@@ -166,7 +172,7 @@ npm run electron
 
 ### 自检脚本
 
-仓库里带了五个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
+仓库里带了六个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
 
 ```bash
 npm run build
@@ -175,6 +181,7 @@ node scripts/smoke.mjs              # 用真实 Chrome 走一遍记账流程并�
 node scripts/flows.mjs              # 深流程：预算超支、建账户、改账目、建分类、持久化
 node scripts/pwa-check.mjs          # 网页版：manifest、图标、SW 缓存、断网后还能打开
 node scripts/live-check.mjs         # 直接打线上 Pages 地址，端到端验证线上那份能用
+node scripts/appearance-check.mjs   # 设置页四组、切语言、上传壁纸、分区独立生效
 
 # 或者验证桌面端（Electron 直接加载 dist/index.html）
 node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edata scripts/electron-check.cjs
@@ -187,6 +194,10 @@ node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edat
 `scripts/pwa-check.mjs` 会：断言 manifest 能被解析且 display 是 standalone → 四个图标都能下载 → Service Worker 进入 `activated` → 缓存里真的有 index.html 和带 hash 的 JS → **切到离线模式后刷新，页面照样能打开**。最后一项是网页版能不能「装到主屏当 App 用」的关键。
 
 `scripts/live-check.mjs` 不走本地，直接打开 <https://yichen520-1.github.io/yichen-ledger/>：记一笔 66.66 元、断言净资产跟着变、四个子页面都能渲染、SW 已注册、没有控制台错误。用来确认**部署上去的那一份**（而不是本地 dist）真的可用。发布之后跑一次最踏实。
+
+`scripts/appearance-check.mjs` 专门盯 v0.2.0 的新东西：设置页四组齐全 → 本地存储横幅在 → 语言下拉切到英文后导航文字和
+`<html lang>` 一起变 → 字号基准调到 120% 后实际字号变大 → 用 canvas 现场生成一张图当壁纸上传 →
+**只有主内容区出现壁纸、侧边栏仍为空**（验证三区域独立）→ 回总览后壁纸还在。
 
 ### 推送代码时如果连不上 GitHub
 
@@ -255,8 +266,8 @@ python scripts/make-pwa-assets.py       # 网页版用的那几张 PNG
 「忆」，马善政毛笔楷书备用），只用来生成图标，不进安装包。印章上的「记」用
 宋体加粗后做刀刻处理 —— 本机没有篆书字体，篆书虽是印章正体，但装不上就算了。
 
-产物结构：`yichen-ledger-0.1.2-win-x64.exe`（约 88 MB，可选安装目录）、
-`yichen-ledger-0.1.2-win-x64.zip`（免安装，约 112 MB）。
+产物结构：`yichen-ledger-0.2.0-win-x64.exe`（约 88 MB，可选安装目录）、
+`yichen-ledger-0.2.0-win-x64.zip`（免安装，约 112 MB）。
 
 > **排坑：别在项目目录里跑产出的安装包。** NSIS 生成卸载程序时会执行一次
 > 自己产出的安装包。如果安装包就躺在项目目录里（比如
@@ -303,7 +314,7 @@ executableName: 'yichen-ledger', // 程序目录名、可执行文件名 —— 
 
 | 平台 | 磁盘上的名字 | 用户看到的名字 |
 | --- | --- | --- |
-| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆尘记账」，窗口标题「忆尘记账」，控制面板「忆尘记账 0.1.2」 |
+| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆尘记账」，窗口标题「忆尘记账」，控制面板「忆尘记账 0.2.0」 |
 | macOS | `/Applications/yichen-ledger.app` | Finder、启动台、Dock 显示「忆尘记账」（来自 `CFBundleName` / `CFBundleDisplayName`） |
 | Linux | `yichen-ledger` 可执行文件 + `*.AppImage` | 应用菜单里显示「忆尘记账」（`.desktop` 的 `Name`） |
 | Android / iOS | `com.yichen.ledger` | 桌面图标下的名字「忆尘记账」 |
@@ -405,8 +416,8 @@ npx cap open ios         # 在 Xcode 里运行 / 打包
 把这一步交给 GitHub Actions —— 它三种系统的 runner 都有：
 
 ```bash
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 推一个 `v*` 的 tag 就会并行跑五个任务，然后建一个 Release，把产物挂上去：
@@ -468,10 +479,14 @@ git push origin v0.1.2
 src/
   domain/model.ts        纯领域逻辑：金额、日期、汇总、CSV（无框架依赖，可单测）
   db/index.ts            Dexie 表结构与默认账户/分类
-  db/repository.ts       所有增删改查、导入导出
+  db/repository.ts       所有增删改查、导入导出（错误只抛错误码，翻译留在界面层）
+  i18n/                  中 / 英 / 日三份词典 + useI18n / useErrorText
   state/LedgerContext.tsx 用 useLiveQuery 订阅数据库，写库后全站自动刷新
+  state/AppearanceContext.tsx 三区域壁纸、字体、配色，写 CSS 变量并落到 settings 表
   pages/                 总览 / 记一笔 / 统计 / 预算 / 我的 / 账户 / 分类
   components/Toast.tsx   轻提示
+  components/Sheet.tsx   底部弹层（portal 到 body，避免被 transform 祖先困住）
+  components/Backdrop.tsx 单个区域的背景图层
   styles.css             深色主题，移动优先，>=900px 切桌面布局
 public/
   manifest.webmanifest   PWA 清单（名字、图标、快捷方式）
