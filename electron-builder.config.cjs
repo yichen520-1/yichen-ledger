@@ -28,7 +28,26 @@ function resolveOutput() {
 
 module.exports = {
   appId: 'com.yichen.ledger',
+  // productName 是「显示名」：窗口标题、开始菜单/桌面快捷方式、macOS 启动台与 Dock、
+  // Linux 应用菜单、控制面板「应用和功能」里看到的都是它 —— 所以保持中文。
   productName: '忆尘记账',
+  /**
+   * executableName 是「文件名」：程序目录名、可执行文件名都用它 —— 所以必须是纯 ASCII。
+   *
+   * 为什么必须分开：
+   * - NSIS 安装包在**安装包自身路径**或**目标安装目录**含非 ASCII 时直接失败（退出码 2），
+   *   用户双击一个放在中文目录下的安装包会装不上，这是真实踩到的坑。
+   * - 默认安装目录取的是 productFilename（= executableName），不是 productName
+   *   （见 app-builder-lib/out/targets/targetUtil.js 的 getWindowsInstallationDirName），
+   *   所以只改这一处就能让 `%LOCALAPPDATA%\Programs\yichen-ledger` 落地。
+   * - macOS 的 .app 目录名同样取 productFilename，而 CFBundleName / CFBundleDisplayName
+   *   取 productName，于是 Finder 里看到「忆尘记账」，磁盘上却是 yichen-ledger.app。
+   * - Linux 的 AppImage 可执行文件与解包目录同理，desktop 条目 Name 仍取 productName。
+   *
+   * 注意：Electron 的 userData 目录取的是 package.json 的 name（本来就是 yichen-ledger），
+   * 与这里无关，所以改名不会让用户的账本数据搬家。
+   */
+  executableName: 'yichen-ledger',
   copyright: 'Copyright © 2026 yichen520-1',
 
   // 进安装包的文件：只要构建产物和主进程，不要源码/测试/脚本
