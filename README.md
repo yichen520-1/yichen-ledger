@@ -3,7 +3,7 @@
 一个**本地优先**的个人记账应用：一套代码，同时运行在 **Android / iOS / Windows / macOS** 上。
 数据全部保存在你自己的设备里（IndexedDB），不经过任何服务器。
 
-> 当前版本 `v0.1.0`，功能可用，持续迭代中。
+> 当前版本 `v0.1.1`，功能可用，持续迭代中。
 
 ![界面预览：桌面版总览与手机版总览、记一笔、统计](docs/screenshots/preview.png)
 
@@ -17,13 +17,21 @@
 
 | 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows | `yichen-ledger-0.1.0-win-x64.exe` | 安装版，可选安装目录 |
-| Windows | `yichen-ledger-0.1.0-win-x64.zip` | 免安装，解压即用 |
-| macOS（Apple 芯片） | `yichen-ledger-0.1.0-mac-arm64.dmg` | M1/M2/M3/M4 |
-| macOS（Intel） | `yichen-ledger-0.1.0-mac-x64.dmg` | 老款 Mac |
-| Linux | `yichen-ledger-0.1.0-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
+| Windows | `yichen-ledger-0.1.1-win-x64.exe` | 安装版，可选安装目录 |
+| Windows | `yichen-ledger-0.1.1-win-x64.zip` | 免安装，解压即用 |
+| macOS（Apple 芯片） | `yichen-ledger-0.1.1-mac-arm64.dmg` | M1/M2/M3/M4 |
+| macOS（Intel） | `yichen-ledger-0.1.1-mac-x64.dmg` | 老款 Mac |
+| Linux | `yichen-ledger-0.1.1-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
 | Android | `app-debug.apk` | 手机浏览器下载后点安装 |
 | iOS | `yichen-ledger-unsigned.ipa` | **未签名**，需自行重签，见下方说明 |
+
+> **安装路径是英文，界面上是中文。** 装好之后程序在
+> `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe`，
+> .app 叫 `yichen-ledger.app`，Linux 的可执行文件也是 `yichen-ledger` ——
+> 全是纯 ASCII，避免非 ASCII 路径在安装器里翻车；
+> 而窗口标题、开始菜单 / 桌面快捷方式、macOS 启动台与 Dock、
+> 控制面板里的名字仍然显示「忆尘记账」。详见下方
+> [「为什么程序名是英文、界面是中文」](#为什么程序名是英文界面是中文)。
 
 > 没有代码签名证书和 Apple 开发者账号，所以：
 > Windows 首次运行会提示「未知发布者」（点「更多信息 → 仍要运行」）；
@@ -232,17 +240,80 @@ npm run pack:dir     # 只解包不打包，用来快速验证
 python scripts/make-icon.py
 ```
 
-产物结构：`忆尘记账 Setup 0.1.0.exe`（约 87 MB，可选安装目录）、
-`忆尘记账-0.1.0-win.zip`（免安装，约 111 MB）。
+产物结构：`yichen-ledger-0.1.1-win-x64.exe`（约 88 MB，可选安装目录）、
+`yichen-ledger-0.1.1-win-x64.zip`（免安装，约 112 MB）。
 
 > **排坑：输出目录不能带中文。** NSIS 生成卸载程序时会执行一次自己产出的
 > 安装包，如果**目录路径**里有中文（比如本项目就放在 `D:\Desktop\忆尘记账`），
 > 这一步会直接失败并报 `process failed 2`。配置里已经做了处理：
 > 检测到路径含非 ASCII 字符就自动把产物输出到系统临时目录
-> （`%TEMP%\yichen-ledger-release`）。文件名带中文没问题，只有路径有影响。
+> （`%TEMP%\yichen-ledger-release`），代码见配置里的 `resolveOutput()`。
+
+> **排坑：界面上的版本号是手写的。** 界面底部和「我的 → 关于」原来写死了
+> `v0.1.0`，发 0.1.1 时忘了改，装好的新版本还显示旧版本号。现在
+> [`vite.config.ts`](vite.config.ts) 在构建时读 `package.json` 的 `version`
+> 注入成 `__APP_VERSION__`，界面里直接用这个常量，版本号只维护一处。
+
+### 为什么程序名是英文、界面是中文
+
+一句话：**`productName` 管显示，`executableName` 管文件**，两者在
+[electron-builder.config.cjs](electron-builder.config.cjs) 里分开设置。
+
+```js
+productName: '忆尘记账',        // 窗口标题、快捷方式、启动台、控制面板
+executableName: 'yichen-ledger', // 程序目录名、可执行文件名 —— 必须是纯 ASCII
+```
+
+分开的理由不是洁癖，是踩出来的：NSIS 安装包只要**安装包自身所在的路径**或
+**用户选的目标安装目录**含非 ASCII 字符，就会直接退出码 2、一个文件都不装。
+之前把 `productName` 当文件名用时，安装目录是
+`%LOCALAPPDATA%\Programs\忆尘记账`，用户把安装包放在中文文件夹里双击就装不上。
+改成 ASCII 之后，默认目录是 `%LOCALAPPDATA%\Programs\yichen-ledger`，
+安装包放在哪都能装。
+
+各平台落地情况：
+
+| 平台 | 磁盘上的名字 | 用户看到的名字 |
+| --- | --- | --- |
+| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆尘记账」，窗口标题「忆尘记账」，控制面板「忆尘记账 0.1.1」 |
+| macOS | `/Applications/yichen-ledger.app` | Finder、启动台、Dock 显示「忆尘记账」（来自 `CFBundleName` / `CFBundleDisplayName`） |
+| Linux | `yichen-ledger` 可执行文件 + `*.AppImage` | 应用菜单里显示「忆尘记账」（`.desktop` 的 `Name`） |
+| Android / iOS | `com.yichen.ledger` | 桌面图标下的名字「忆尘记账」 |
+
+> **换名字不会丢数据。** Electron 的用户数据目录取的是 `package.json` 的
+> `name`，本来就是 `yichen-ledger`（Windows 上是
+> `%APPDATA%\yichen-ledger`）。所以把可执行文件从 `忆尘记账.exe` 改成
+> `yichen-ledger.exe`，账本、设置、IndexedDB 全都原地不动。
 
 > 没有代码签名证书，所以安装时 Windows SmartScreen 会提示「未知发布者」，
 > 点「更多信息 → 仍要运行」即可。要消掉这个提示需要购买代码签名证书。
+
+### 安装器为什么要自定义 NSIS 脚本（`build/installer.nsh`）
+
+electron-builder 生成的安装器在装新版本前，会先去执行旧版本的卸载器。
+它从注册表读 `UninstallString` 和 `InstallLocation`，把旧卸载器复制到
+`$PLUGINSDIR` 里再 `ExecWait` 等它结束。如果旧安装目录被手工删掉/移动过
+（或者注册表里是一条残留项），这一步必然失败，而模板里的默认处理是：
+
+```
+MessageBox "Failed to uninstall old application files. Please try running the installer again.: 2"
+SetErrorLevel 2
+Quit
+```
+
+也就是说，**用户从此再也装不上任何新版本**，除非自己去清注册表。这是个
+很糟糕的失败模式，而本应用是装在 `%LOCALAPPDATA%\Programs` 下的按用户安装，
+用户手滑删目录太常见了。
+
+所以 [`build/installer.nsh`](build/installer.nsh) 覆盖了
+`customUnInstallCheck` / `customUnInstallCheckCurrentUser` 两个钩子：
+旧卸载器返回非 0 时只写进安装日志，然后继续装新版本——新版本会重写
+注册表项和快捷方式。最坏的情况是留下一个孤立目录，用户自己删掉即可。
+
+验证方式（模拟用户遇到的脏状态）：手工在
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\<APP_GUID>`
+下写一条指向不存在目录的 `UninstallString`，再静默运行安装包 ——
+修复前退出码 2 并弹窗，修复后退出码 0、正常装上。
 
 ### Android（Capacitor）
 
@@ -293,8 +364,8 @@ npx cap open ios         # 在 Xcode 里运行 / 打包
 把这一步交给 GitHub Actions —— 它三种系统的 runner 都有：
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 推一个 `v*` 的 tag 就会并行跑五个任务，然后建一个 Release，把产物挂上去：

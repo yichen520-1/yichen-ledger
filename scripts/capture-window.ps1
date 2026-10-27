@@ -25,6 +25,11 @@ public class Win32 {
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
+    // 窗口最小化时 GetWindowRect 只返回标题栏那一条（158x26），截出来就是一条细边。
+    // 截图前先 SW_RESTORE(9) 还原成正常大小。
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
+
     // 本进程 DPI 不感知，GetWindowRect 返回的是「逻辑像素」（1707x1067 的坐标系），
     // 而 PrintWindow 画的是「物理像素」（真屏 2560x1600）。两者差一个缩放比，
     // 位图不按这个比例放大，右侧和下边就会被裁掉。
@@ -55,7 +60,9 @@ if ($scale -lt 1) { $scale = 1.0 }
 $outPath = [System.IO.Path]::GetFullPath("$PWD\.shots\packaged-app.png")
 New-Item -ItemType Directory -Force -Path (Split-Path $outPath) | Out-Null
 
-$proc = Get-Process -Name "忆尘记账" -ErrorAction SilentlyContinue |
+# 进程名跟着可执行文件名走：0.1.1 起是可执行文件是 yichen-ledger.exe，
+# 0.1.0 及更早是「忆尘记账.exe」。两个都找，谁有窗口用谁。
+$proc = Get-Process -Name "yichen-ledger", "忆尘记账" -ErrorAction SilentlyContinue |
         Where-Object { $_.MainWindowHandle -ne 0 } |
         Select-Object -First 1
 
@@ -65,6 +72,11 @@ if (-not $proc) {
 }
 
 $hwnd = $proc.MainWindowHandle
+# 被最小化时先还原，否则拿到的是标题栏的尺寸
+if ([Win32]::IsIconic($hwnd)) {
+    [void][Win32]::ShowWindow($hwnd, 9)
+    Start-Sleep -Milliseconds 800
+}
 $rect = New-Object Win32+RECT
 [void][Win32]::GetWindowRect($hwnd, [ref]$rect)
 $lw = $rect.Right - $rect.Left
