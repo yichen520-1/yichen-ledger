@@ -25,22 +25,52 @@ export interface TransactionDraft {
   tagsText: string;
 }
 
-export class ValidationError extends Error {}
+/**
+ * 数据层能抛出的错误码。
+ *
+ * 这里只放「键」，不放中文句子：错误最终会弹成 toast，而界面语言可能是
+ * 中文/英文/日文。把翻译留在界面层（useErrorText），数据层就不用关心
+ * 用户在看哪种语言，也避免 en/ja 界面里突然冒出中文。
+ */
+export type ErrorCode =
+  | 'errors.amountInvalid'
+  | 'errors.accountRequired'
+  | 'errors.toAccountRequired'
+  | 'errors.sameAccount'
+  | 'errors.categoryRequired'
+  | 'errors.dateInvalid'
+  | 'errors.notFound'
+  | 'errors.accountInUse'
+  | 'errors.categoryInUse'
+  | 'errors.builtinCategory'
+  | 'errors.backupInvalid'
+  | 'errors.csvEmpty'
+  | 'errors.csvHeader';
+
+export class ValidationError extends Error {
+  readonly code: ErrorCode;
+
+  constructor(code: ErrorCode) {
+    super(code);
+    this.name = 'ValidationError';
+    this.code = code;
+  }
+}
 
 /** 校验草稿，返回可入库的对象（不含 id / 时间戳） */
 export function validateDraft(
   draft: TransactionDraft,
 ): Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> {
   const amount = parseAmountToCents(draft.amountText);
-  if (amount === null || amount <= 0) throw new ValidationError('请输入大于 0 的金额');
-  if (!draft.accountId) throw new ValidationError('请选择账户');
+  if (amount === null || amount <= 0) throw new ValidationError('errors.amountInvalid');
+  if (!draft.accountId) throw new ValidationError('errors.accountRequired');
   if (draft.type === 'transfer') {
-    if (!draft.toAccountId) throw new ValidationError('请选择转入账户');
-    if (draft.toAccountId === draft.accountId) throw new ValidationError('转出和转入账户不能相同');
+    if (!draft.toAccountId) throw new ValidationError('errors.toAccountRequired');
+    if (draft.toAccountId === draft.accountId) throw new ValidationError('errors.sameAccount');
   } else if (!draft.categoryId) {
-    throw new ValidationError('请选择分类');
+    throw new ValidationError('errors.categoryRequired');
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) throw new ValidationError('日期格式不正确');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) throw new ValidationError('errors.dateInvalid');
   return {
     type: draft.type,
     amount,
@@ -83,7 +113,7 @@ export async function createTransaction(draft: TransactionDraft): Promise<Transa
 export async function updateTransaction(id: string, draft: TransactionDraft): Promise<Transaction> {
   const base = validateDraft(draft);
   const existing = await db.transactions.get(id);
-  if (!existing) throw new ValidationError('这条记录不存在，可能已被删除');
+  if (!existing) throw new ValidationError('errors.notFound');
   const tx: Transaction = { ...existing, ...base, updatedAt: new Date().toISOString() };
   await db.transactions.put(tx);
   return tx;
@@ -102,7 +132,7 @@ export async function saveAccount(input: Omit<Account, 'createdAt'> & { createdA
 export async function deleteAccount(id: string): Promise<void> {
   const used = await db.transactions.where('accountId').equals(id).count();
   const usedAsTarget = await db.transactions.where('toAccountId').equals(id).count();
-  if (used + usedAsTarget > 0) throw new ValidationError('这个账户已有账目，不能删除；可以改为「归档」');
+  if (used + usedAsTarget > 0) throw new ValidationError('errors.accountInUse');
   await db.accounts.delete(id);
 }
 
@@ -113,9 +143,9 @@ export async function saveCategory(input: Category): Promise<Category> {
 
 export async function deleteCategory(id: string): Promise<void> {
   const used = await db.transactions.where('categoryId').equals(id).count();
-  if (used > 0) throw new ValidationError('这个分类下已有账目，不能删除');
+  if (used > 0) throw new ValidationError('errors.categoryInUse');
   const cat = await db.categories.get(id);
-  if (cat?.builtin) throw new ValidationError('内置分类不能删除');
+  if (cat?.builtin) throw new ValidationError('errors.builtinCategory');
   await db.categories.delete(id);
 }
 
@@ -164,7 +194,7 @@ export async function importBackup(json: string): Promise<void> {
     budgets?: Budget[];
   };
   if (!Array.isArray(data.accounts) || !Array.isArray(data.transactions)) {
-    throw new ValidationError('这不是有效的忆尘记账备份文件');
+    throw new ValidationError('errors.backupInvalid');
   }
   await db.transaction('rw', db.accounts, db.categories, db.transactions, db.budgets, async () => {
     await Promise.all([
@@ -194,7 +224,7 @@ export async function exportCsvText(): Promise<string> {
 /** 导入 CSV：按名称匹配分类/账户，缺失时自动新建 */
 export async function importCsvText(text: string): Promise<{ imported: number; skipped: number }> {
   const rows = parseCsv(text);
-  if (rows.length < 2) throw new ValidationError('CSV 里没有数据行');
+  if (rows.length < 2) throw new ValidationError('errors.csvEmpty');
   const header = rows[0];
   const idx = (name: string) => header.findIndex((h) => h.trim() === name);
   const iDate = idx('日期');
@@ -206,7 +236,7 @@ export async function importCsvText(text: string): Promise<{ imported: number; s
   const iNote = idx('备注');
   const iTags = idx('标签');
   if (iDate < 0 || iType < 0 || iAmount < 0) {
-    throw new ValidationError('表头需要包含「日期」「类型」「金额」三列');
+    throw new ValidationError('errors.csvHeader');
   }
 
   const accounts = await db.accounts.toArray();

@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useLedger } from '../state/LedgerContext';
 import { useToast } from '../components/Toast';
+import { Sheet } from '../components/Sheet';
+import { useI18n } from '../i18n';
 import { deleteBudget, saveBudget } from '../db/repository';
 import {
   budgetStatus,
@@ -15,6 +17,7 @@ import {
 
 export default function Budgets() {
   const { budgets, categories, transactions } = useLedger();
+  const { t } = useI18n();
   const toast = useToast();
   const [month, setMonth] = useState(currentMonthKey());
   const [open, setOpen] = useState(false);
@@ -35,7 +38,7 @@ export default function Budgets() {
 
   async function add() {
     const amount = parseAmountToCents(amountText);
-    if (amount === null || amount <= 0) return toast('请输入预算金额');
+    if (amount === null || amount <= 0) return toast(t('budgets.amountRequired'));
     const budget: Budget = {
       id: newId('bg-'),
       categoryId: categoryId || null,
@@ -47,36 +50,36 @@ export default function Budgets() {
     setOpen(false);
     setAmountText('');
     setCategoryId('');
-    toast('预算已设置');
+    toast(t('budgets.added'));
   }
 
   async function remove(id: string) {
-    if (!window.confirm('删除这个预算？')) return;
+    if (!window.confirm(t('budgets.confirmDelete'))) return;
     await deleteBudget(id);
-    toast('已删除');
+    toast(t('common.delete'));
   }
 
   return (
     <>
       <div className="page-head">
         <div>
-          <h1 className="page-title">预算</h1>
+          <h1 className="page-title">{t('budgets.title')}</h1>
           <div className="page-sub">
-            {month.replace('-', '/')} · {monthStatuses.length} 个预算
+            {t('budgets.sub', { month: month.replace('-', '/'), count: monthStatuses.length })}
           </div>
         </div>
         <button className="btn primary" onClick={() => setOpen(true)}>
           <Plus size={15} />
-          新建
+          {t('budgets.new')}
         </button>
       </div>
 
       <div className="month-nav" style={{ marginBottom: 14 }}>
-        <button onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label="上个月">
+        <button onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label={t('stats.prevMonth')}>
           ‹
         </button>
-        <div className="label">{month.replace('-', '/')}</div>
-        <button onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label="下个月">
+        <div className="label">{t('stats.monthLabel', { m: Number(month.slice(5)) })}</div>
+        <button onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label={t('stats.nextMonth')}>
           ›
         </button>
       </div>
@@ -85,7 +88,7 @@ export default function Budgets() {
         <section className="card">
           <div className="row">
             <div className="grow">
-              <div className="muted">总预算</div>
+              <div className="muted">{t('budgets.total')}</div>
               <div className="mono" style={{ fontSize: 20, fontWeight: 700 }}>
                 {formatCents(totalSpent)} <span className="muted">/ {formatCents(totalBudget)}</span>
               </div>
@@ -99,8 +102,8 @@ export default function Budgets() {
           </div>
           <div className="muted">
             {totalSpent > totalBudget
-              ? `已超支 ${formatCents(totalSpent - totalBudget)}`
-              : `还剩 ${formatCents(totalBudget - totalSpent)} 可用`}
+              ? t('budgets.over', { amount: formatCents(totalSpent - totalBudget) })
+              : t('budgets.remain', { amount: formatCents(totalBudget - totalSpent) })}
           </div>
         </section>
       ) : null}
@@ -108,7 +111,7 @@ export default function Budgets() {
       {monthStatuses.length === 0 ? (
         <div className="card empty">
           <span className="emoji">🎯</span>
-          还没有设置预算。设一个每月上限，超支时会提醒你。
+          {t('budgets.empty')}
         </div>
       ) : (
         <section className="card" style={{ marginTop: 12 }}>
@@ -120,17 +123,20 @@ export default function Budgets() {
                 <div className="row">
                   <div className="grow">
                     <div style={{ fontWeight: 500 }}>
-                      {cat ? `${cat.icon} ${cat.name}` : '🌈 总预算'}
-                      {s.budget.month ? <span className="muted"> · 仅本月</span> : null}
+                      {cat ? `${cat.icon} ${cat.name}` : `🌈 ${t('budgets.allBudget')}`}
+                      {s.budget.month ? <span className="muted"> · {t('common.monthOnly')}</span> : null}
                     </div>
                     <div className="muted">
-                      已用 {formatCents(s.spent)} / {formatCents(s.budget.amount)}
+                      {t('budgets.used', {
+                        spent: formatCents(s.spent),
+                        total: formatCents(s.budget.amount),
+                      })}
                     </div>
                   </div>
                   <div className="mono" style={{ color, fontWeight: 700 }}>
                     {(s.ratio * 100).toFixed(0)}%
                   </div>
-                  <button onClick={() => remove(s.budget.id)} aria-label="删除预算" style={{ color: 'var(--text-faint)' }}>
+                  <button onClick={() => remove(s.budget.id)} aria-label={t('common.delete')} style={{ color: 'var(--text-faint)' }}>
                     <Trash2 size={15} />
                   </button>
                 </div>
@@ -144,52 +150,47 @@ export default function Budgets() {
       )}
 
       <div className="muted" style={{ marginTop: 14, paddingLeft: 4 }}>
-        提示：预算只管「支出」，转账和收入不计入。
+        {t('budgets.tip')}
       </div>
 
-      {open ? (
-        <div className="sheet-mask" onClick={() => setOpen(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <h3>新建预算</h3>
-            <div className="field">
-              <label>分类</label>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                <option value="">全部分类（总预算）</option>
-                {expenseCats.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>金额</label>
-              <input
-                inputMode="decimal"
-                value={amountText}
-                placeholder="0.00"
-                onChange={(e) => setAmountText(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="field">
-              <label>周期</label>
-              <select value={scope} onChange={(e) => setScope(e.target.value as 'month' | 'always')}>
-                <option value="always">每月重复</option>
-                <option value="month">仅 {month}</option>
-              </select>
-            </div>
-            <div className="row" style={{ marginTop: 18 }}>
-              <button className="btn grow" onClick={() => setOpen(false)}>
-                取消
-              </button>
-              <button className="btn primary grow" onClick={add}>
-                保存
-              </button>
-            </div>
-          </div>
+      <Sheet open={open} onClose={() => setOpen(false)} title={t('budgets.sheetTitle')}>
+        <div className="field">
+          <label>{t('budgets.category')}</label>
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            <option value="">{t('budgets.allCategories')}</option>
+            {expenseCats.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </div>
-      ) : null}
+        <div className="field">
+          <label>{t('budgets.amount')}</label>
+          <input
+            inputMode="decimal"
+            value={amountText}
+            placeholder="0.00"
+            onChange={(e) => setAmountText(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div className="field">
+          <label>{t('budgets.period')}</label>
+          <select value={scope} onChange={(e) => setScope(e.target.value as 'month' | 'always')}>
+            <option value="always">{t('budgets.monthly')}</option>
+            <option value="month">{t('budgets.onlyMonth', { month })}</option>
+          </select>
+        </div>
+        <div className="row" style={{ marginTop: 18 }}>
+          <button className="btn grow" onClick={() => setOpen(false)}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn primary grow" onClick={add}>
+            {t('common.save')}
+          </button>
+        </div>
+      </Sheet>
     </>
   );
 }

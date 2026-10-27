@@ -18,6 +18,20 @@
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
+
+  /* 外观设置会用 JS 覆盖下面这几个变量，这里的值是出厂默认 */
+  --font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
+    'Hiragino Sans GB', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-scale: 1;
+  --glass-alpha: 1;
+  --glass-blur: 0px;
+
+  /* iOS 那种「先慢后快再收住」的曲线，全站动画共用 */
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 180ms;
+  --dur-base: 320ms;
+  --dur-slow: 460ms;
 }
 
 * {
@@ -60,9 +74,8 @@ body,
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
-    'Hiragino Sans GB', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  font-size: 15px;
+  font-family: var(--font-stack);
+  font-size: calc(15px * var(--font-scale, 1));
   line-height: 1.5;
   overscroll-behavior-y: none;
 }
@@ -99,8 +112,69 @@ textarea {
   position: sticky;
   top: 0;
   height: 100vh;
+}
+
+.sidebar-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
   flex-direction: column;
   gap: 4px;
+  height: 100%;
+}
+
+/* ---------------- 背景层 ---------------- */
+
+/*
+ * 每个区域各自铺一层背景：滤镜只作用在这一层上，
+ * 所以文字和卡片不会被一起糊掉。内容靠 .xxx-inner 的 z-index 叠在上面。
+ */
+.has-backdrop {
+  position: relative;
+  overflow: hidden;
+}
+
+/*
+ * 注意：这里不能给 .has-backdrop 整体加 isolation: isolate。
+ * <main> 一旦成为层叠上下文，里面那些 position: fixed 的 .sheet-mask
+ * 就只在 <main> 内部比 z-index 了；而 .main 在 .shell 里是 z-index: auto，
+ * 结果整个弹层会被 z-index: 30 的 .tabbar 盖住 —— 表现为弹层打开时
+ * 点到的是底部导航条（动画期间输入框正好扫过 tabbar 那一条就会误触）。
+ * 所以只给不会装 fixed 弹层的侧边栏单独隔离。
+ */
+.sidebar.has-backdrop {
+  isolation: isolate;
+  /* .has-backdrop 会把 position 设成 relative，这里改回来，侧边栏才能一直贴住 */
+  position: sticky;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.backdrop-layer {
+  position: absolute;
+  inset: -20%;
+  /* -20% 是为了让「缩小 / 位移」时四边不露底 */
+  will-change: transform, filter;
+  transition: filter var(--dur-base) var(--ease-out-soft);
+}
+
+.backdrop-dim {
+  position: absolute;
+  inset: 0;
+}
+
+/* 玻璃质感：只有开了才让卡片半透明 */
+[data-glass='on'] .card,
+[data-glass='on'] .overview,
+[data-glass='on'] .sheet {
+  background: rgba(22, 27, 34, var(--glass-alpha, 1));
+  backdrop-filter: blur(var(--glass-blur, 0px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 0px));
 }
 
 .brand {
@@ -119,7 +193,7 @@ textarea {
   display: grid;
   place-items: center;
   font-family: 'STXingkai', '华文行楷', 'KaiTi', '楷体', 'Xingkai SC', serif;
-  font-size: 21px;
+  font-size: calc(21px * var(--font-scale, 1));
   line-height: 1;
   color: #141210;
   font-weight: 600;
@@ -142,12 +216,12 @@ textarea {
 
 .brand-text strong {
   display: block;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   letter-spacing: 0.02em;
 }
 
 .brand-text span {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   color: var(--text-faint);
   letter-spacing: 0.06em;
   /* 标语比正文更需要呼吸：行距拉开一点，像题在画边的款识 */
@@ -164,7 +238,7 @@ textarea {
   border-radius: var(--radius-sm);
   color: var(--text-dim);
   text-decoration: none;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   transition: background 0.15s, color 0.15s;
 }
 
@@ -186,6 +260,16 @@ textarea {
   max-width: 100%;
 }
 
+.main-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar-version {
+  padding: 0 12px;
+  font-size: calc(11.5px * var(--font-scale, 1));
+}
+
 .page-head {
   display: flex;
   align-items: center;
@@ -195,14 +279,14 @@ textarea {
 }
 
 .page-title {
-  font-size: 22px;
+  font-size: calc(22px * var(--font-scale, 1));
   font-weight: 700;
   margin: 0;
   letter-spacing: 0.01em;
 }
 
 .page-sub {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-faint);
   margin-top: 2px;
 }
@@ -213,12 +297,17 @@ textarea {
   left: 0;
   right: 0;
   bottom: 0;
-  display: flex;
   border-top: 1px solid var(--line);
   background: rgba(18, 22, 28, 0.94);
   backdrop-filter: blur(14px);
   padding-bottom: var(--safe-b);
   z-index: 30;
+}
+
+.tabbar-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
 }
 
 .tab {
@@ -230,7 +319,7 @@ textarea {
   padding: 9px 0 8px;
   color: var(--text-faint);
   text-decoration: none;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--font-scale, 1));
 }
 
 .tab.active {
@@ -249,7 +338,7 @@ textarea {
   color: #2a1500;
   display: grid;
   place-items: center;
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
   font-weight: 700;
   box-shadow: 0 6px 16px rgba(239, 138, 75, 0.35);
   margin-top: -12px;
@@ -269,7 +358,7 @@ textarea {
 }
 
 .section-title {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: var(--text-dim);
   font-weight: 600;
   margin: 22px 0 10px;
@@ -280,7 +369,7 @@ textarea {
 
 .section-title a {
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   text-decoration: none;
   font-weight: 400;
 }
@@ -292,13 +381,13 @@ textarea {
 }
 
 .overview .networth-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-dim);
   letter-spacing: 0.06em;
 }
 
 .overview .networth {
-  font-size: 34px;
+  font-size: calc(34px * var(--font-scale, 1));
   font-weight: 700;
   letter-spacing: -0.01em;
   margin: 4px 0 14px;
@@ -317,12 +406,12 @@ textarea {
 }
 
 .overview .k {
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--font-scale, 1));
   color: var(--text-faint);
 }
 
 .overview .v {
-  font-size: 17px;
+  font-size: calc(17px * var(--font-scale, 1));
   font-weight: 600;
   margin-top: 2px;
   font-variant-numeric: tabular-nums;
@@ -362,7 +451,7 @@ textarea {
   border-radius: 12px;
   display: grid;
   place-items: center;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   background: var(--bg-elev-2);
 }
 
@@ -372,7 +461,7 @@ textarea {
 }
 
 .tx-title {
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--font-scale, 1));
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -380,7 +469,7 @@ textarea {
 }
 
 .tx-meta {
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--font-scale, 1));
   color: var(--text-faint);
   white-space: nowrap;
   overflow: hidden;
@@ -390,7 +479,7 @@ textarea {
 .tx-amount {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   white-space: nowrap;
 }
 
@@ -409,7 +498,7 @@ textarea {
 .day-head {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-faint);
   padding: 14px 4px 4px;
 }
@@ -418,11 +507,11 @@ textarea {
   text-align: center;
   color: var(--text-faint);
   padding: 42px 16px;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--font-scale, 1));
 }
 
 .empty .emoji {
-  font-size: 30px;
+  font-size: calc(30px * var(--font-scale, 1));
   display: block;
   margin-bottom: 10px;
   opacity: 0.75;
@@ -448,7 +537,7 @@ textarea {
   flex: 1;
   padding: 8px 0;
   border-radius: 9px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: var(--text-dim);
   transition: all 0.15s;
 }
@@ -475,7 +564,7 @@ textarea {
 .amount-display {
   text-align: right;
   padding: 26px 6px 14px;
-  font-size: 42px;
+  font-size: calc(42px * var(--font-scale, 1));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -484,7 +573,7 @@ textarea {
 }
 
 .amount-display .suffix {
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   color: var(--text-faint);
   font-weight: 400;
   margin-left: 6px;
@@ -510,12 +599,12 @@ textarea {
   border-radius: 12px;
   background: var(--bg-elev);
   border: 1px solid transparent;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--font-scale, 1));
   color: var(--text-dim);
 }
 
 .cat-chip .ico {
-  font-size: 21px;
+  font-size: calc(21px * var(--font-scale, 1));
   line-height: 1.2;
 }
 
@@ -535,7 +624,7 @@ textarea {
 
 .field label {
   color: var(--text-dim);
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--font-scale, 1));
   flex: 0 0 62px;
 }
 
@@ -546,7 +635,7 @@ textarea {
   background: transparent;
   border: none;
   outline: none;
-  font-size: 14.5px;
+  font-size: calc(14.5px * var(--font-scale, 1));
   padding: 2px 0;
   min-width: 0;
 }
@@ -566,7 +655,7 @@ textarea {
   padding: 14px 0;
   border-radius: 12px;
   background: var(--bg-elev);
-  font-size: 19px;
+  font-size: calc(19px * var(--font-scale, 1));
   font-weight: 500;
   transition: background 0.1s;
 }
@@ -577,7 +666,7 @@ textarea {
 
 .keypad .key-fn {
   background: var(--bg-elev-2);
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   color: var(--text-dim);
 }
 
@@ -586,7 +675,7 @@ textarea {
   background: linear-gradient(160deg, #ffc978, #ef8a4b);
   color: #2a1500;
   font-weight: 700;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
 }
 
 .keypad .key-ok:disabled {
@@ -613,7 +702,7 @@ textarea {
 }
 
 .month-nav .label {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
   min-width: 88px;
   text-align: center;
@@ -629,7 +718,7 @@ textarea {
 
 .bar-label {
   flex: 0 0 76px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
@@ -653,7 +742,7 @@ textarea {
 .bar-value {
   flex: 0 0 78px;
   text-align: right;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--font-scale, 1));
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
 }
@@ -661,7 +750,7 @@ textarea {
 .bar-pct {
   flex: 0 0 38px;
   text-align: right;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--font-scale, 1));
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
@@ -679,7 +768,7 @@ textarea {
 
 .chart text {
   fill: var(--text-faint);
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale, 1));
 }
 
 /* 柱子下面的月份 / 金额行：用 HTML 排版，避免 SVG 被拉伸时把字也拉变形 */
@@ -690,12 +779,12 @@ textarea {
 }
 
 .chart-axis .m {
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--font-scale, 1));
   color: var(--text-dim);
 }
 
 .chart-axis .v {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--font-scale, 1));
   color: var(--text-faint);
   margin-top: 3px;
   font-variant-numeric: tabular-nums;
@@ -713,7 +802,7 @@ textarea {
   border-radius: 5px;
   background: var(--bg-elev-2);
   position: relative;
-  font-size: 9px;
+  font-size: calc(9px * var(--font-scale, 1));
   display: grid;
   place-items: center;
   color: var(--text-faint);
@@ -723,7 +812,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   color: var(--text-faint);
   margin-top: 10px;
   justify-content: flex-end;
@@ -766,7 +855,7 @@ textarea {
   border-radius: 11px;
   background: var(--bg-elev-2);
   color: var(--text);
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 500;
   border: 1px solid var(--line);
   transition: filter 0.15s;
@@ -808,7 +897,7 @@ textarea {
 
 .muted {
   color: var(--text-faint);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--font-scale, 1));
 }
 
 /* 「我的 → 数据备份」里的一行小字：从侧边栏搬过来的那句承诺。
@@ -817,7 +906,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: var(--text-dim);
   letter-spacing: 0.045em;
   margin-bottom: 7px;
@@ -836,13 +925,218 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- 设置页 ---------- */
+/* 一行设置：左说明、右控件，窄屏时自动换行 */
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.set-row:last-child {
+  border-bottom: 0;
+}
+
+.set-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.set-name {
+  font-size: calc(14px * var(--font-scale, 1));
+  color: var(--text);
+}
+
+.set-hint {
+  font-size: calc(11.5px * var(--font-scale, 1));
+  color: var(--text-faint);
+  margin-top: 3px;
+  line-height: 1.5;
+}
+
+.set-ctl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.set-select {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 7px 10px;
+  font-size: calc(13.5px * var(--font-scale, 1));
+  font-family: inherit;
+  max-width: 190px;
+}
+
+.color-dot {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg-elev-2);
+  cursor: pointer;
+}
+
+.switch {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.btn.tiny {
+  padding: 6px 11px;
+  font-size: calc(12px * var(--font-scale, 1));
+  border-radius: 9px;
+  font-weight: 400;
+}
+
+/* 滑杆一行：上面是名字与数值，下面整条滑杆 */
+.slider-row {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.slider-row:last-child {
+  border-bottom: 0;
+}
+
+.slider-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: calc(12.5px * var(--font-scale, 1));
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.slider-head .mono {
+  color: var(--accent);
+}
+
+.slider-row input[type='range'] {
+  width: 100%;
+  height: 3px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--line);
+  border-radius: 2px;
+  outline: none;
+}
+
+.slider-row input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.slider-row input[type='range']::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  cursor: pointer;
+}
+
+/* 三个区域切换：侧边栏 / 主内容 / 底部导航 */
+.region-tabs {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 3px;
+  margin: 10px 0 12px;
+}
+
+.region-tabs button {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 8px;
+  font-size: calc(12.5px * var(--font-scale, 1));
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  position: relative;
+}
+
+.region-tabs button.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 该区域已设壁纸时点一颗琥珀小点 */
+.dot-on {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.chip-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: calc(12.5px * var(--font-scale, 1));
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 5px 9px 5px 11px;
+  text-decoration: none;
+}
+
+.stat-num {
+  font-size: calc(20px * var(--font-scale, 1));
+  font-weight: 700;
+}
+
+/* 醒目提示条：本地存储横幅 */
+.banner-warn {
+  border-color: rgba(255, 180, 84, 0.34);
+  background: linear-gradient(150deg, rgba(255, 180, 84, 0.13), rgba(255, 180, 84, 0.05));
+  color: #ffd9a8;
+}
+
+.banner-warn svg {
+  color: var(--accent);
+}
+
+.banner-title {
+  font-size: calc(14px * var(--font-scale, 1));
+  font-weight: 600;
+  color: #ffe0b6;
+  margin-bottom: 4px;
+}
+
+.banner-body {
+  font-size: calc(12.5px * var(--font-scale, 1));
+  line-height: 1.62;
+  color: #e5c9a4;
+}
+
 .alert {
   background: rgba(242, 100, 90, 0.12);
   border: 1px solid rgba(242, 100, 90, 0.35);
   color: #ffb4ad;
   padding: 10px 12px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   margin-bottom: 12px;
 }
 
@@ -856,10 +1150,10 @@ textarea {
   color: var(--text);
   padding: 10px 18px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   z-index: 60;
   box-shadow: var(--shadow);
-  animation: toast-in 0.18s ease;
+  /* 动画统一放在文件末尾的「动画」一节里，避免两处声明打架 */
 }
 
 @keyframes toast-in {
@@ -889,19 +1183,11 @@ textarea {
   padding: 18px 18px calc(18px + var(--safe-b));
   max-height: 88vh;
   overflow-y: auto;
-  animation: sheet-up 0.2s ease;
-}
-
-@keyframes sheet-up {
-  from {
-    transform: translateY(24px);
-    opacity: 0.6;
-  }
 }
 
 .sheet h3 {
   margin: 0 0 14px;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
 }
 
 /* 桌面端适配 */
@@ -919,7 +1205,7 @@ textarea {
   }
 
   .page-title {
-    font-size: 26px;
+    font-size: calc(26px * var(--font-scale, 1));
   }
 
   .main-inner {
@@ -953,4 +1239,129 @@ textarea {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---------------- 动画 ---------------- */
+
+/*
+ * 用 iOS 的节奏：位移走 --ease-ios（起步快、末尾收得干净），
+ * 淡入淡出走 --ease-out-soft。时长控制在 320ms 上下——
+ * 再长会显得迟钝，再短就看不出方向。
+ */
+
+.page-swap {
+  animation: page-forward var(--dur-base) var(--ease-ios) both;
+}
+
+.page-swap-forward {
+  animation-name: page-forward;
+}
+
+.page-swap-back {
+  animation-name: page-back;
+}
+
+/* 记账页是从底部盖上来的一层，不是左右切换 */
+.page-swap-up {
+  animation-name: page-up;
+}
+
+@keyframes page-forward {
+  from {
+    transform: translate3d(22px, 0, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes page-back {
+  from {
+    transform: translate3d(-22px, 0, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes page-up {
+  from {
+    transform: translate3d(0, 26px, 0);
+    opacity: 0;
+  }
+}
+
+/* 列表逐条浮现：用 CSS 变量 --i 控制延迟，最多错开 8 条 */
+.stagger > * {
+  animation: rise-in var(--dur-base) var(--ease-out-soft) both;
+  animation-delay: calc(var(--i, 0) * 32ms);
+}
+
+@keyframes rise-in {
+  from {
+    transform: translate3d(0, 10px, 0);
+    opacity: 0;
+  }
+}
+
+/* 按下时的回弹：银行卡、账目行、按钮都有一点「实体感」 */
+.card,
+.tx-row,
+.nav-item,
+.tab,
+.btn,
+.cat-chip {
+  transition:
+    transform var(--dur-fast) var(--ease-out-soft),
+    background-color var(--dur-fast) linear,
+    border-color var(--dur-fast) linear,
+    color var(--dur-fast) linear,
+    box-shadow var(--dur-fast) linear;
+}
+
+.tx-row:active,
+.nav-item:active,
+.tab:active,
+.cat-chip:active {
+  transform: scale(0.985);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn.primary:active:not(:disabled) {
+  box-shadow: 0 2px 8px rgba(239, 138, 75, 0.28);
+}
+
+/* 弹出层：遮罩淡入 + 面板阻尼上浮 */
+.sheet-mask {
+  animation: fade-in var(--dur-fast) var(--ease-out-soft) both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.sheet {
+  animation: sheet-spring var(--dur-slow) var(--ease-ios) both;
+}
+
+@keyframes sheet-spring {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  70% {
+    transform: translate3d(0, -6px, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* 数字变化时轻微「顶一下」，让记账有反馈 */
+.amount-display .value {
+  transition: transform var(--dur-fast) var(--ease-out-soft);
+}
+
+.toast {
+  animation: toast-in var(--dur-base) var(--ease-ios) both;
 }

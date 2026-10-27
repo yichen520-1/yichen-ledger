@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLedger } from '../state/LedgerContext';
+import { useI18n } from '../i18n';
 import {
   currentMonthKey,
   dailyExpense,
@@ -13,8 +14,6 @@ import {
   shiftMonth,
 } from '../domain/model';
 
-const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
-
 /** 'YYYY-MM-DD' 的星期几（0=周日）。用本地时间构造，避免 new Date('2024-03-01') 被当成 UTC 而偏差一天 */
 function weekdayOf(dateKey: string): number {
   const [y, m, d] = dateKey.split('-').map(Number);
@@ -23,6 +22,7 @@ function weekdayOf(dateKey: string): number {
 
 export default function Stats() {
   const { categories, transactions } = useLedger();
+  const { t, dict } = useI18n();
   const [month, setMonth] = useState(currentMonthKey());
 
   const totals = useMemo(() => monthTotals(transactions, month), [transactions, month]);
@@ -31,7 +31,7 @@ export default function Stats() {
 
   const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
-  const maxTrend = Math.max(1, ...trend.map((t) => Math.max(t.expense, t.income)));
+  const maxTrend = Math.max(1, ...trend.map((point) => Math.max(point.expense, point.income)));
   const maxCat = Math.max(1, ...byCategory.map((c) => c.amount));
 
   const days = useMemo(() => {
@@ -62,17 +62,17 @@ export default function Stats() {
     <>
       <div className="page-head">
         <div>
-          <h1 className="page-title">统计</h1>
-          <div className="page-sub">看清钱花在哪里</div>
+          <h1 className="page-title">{t('stats.title')}</h1>
+          <div className="page-sub">{t('stats.sub')}</div>
         </div>
         <div className="month-nav">
-          <button onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label="上个月">
+          <button onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label={t('stats.prevMonth')}>
             <ChevronLeft size={16} />
           </button>
-          <div className="label">{month.replace('-', '/')}</div>
+          <div className="label">{t('stats.monthLabel', { m: Number(month.slice(5)) })}</div>
           <button
             onClick={() => setMonth((m) => shiftMonth(m, 1))}
-            aria-label="下个月"
+            aria-label={t('stats.nextMonth')}
             disabled={month >= currentMonthKey()}
             style={{ opacity: month >= currentMonthKey() ? 0.4 : 1 }}
           >
@@ -84,45 +84,49 @@ export default function Stats() {
       <section className="card">
         <div className="row" style={{ gap: 18 }}>
           <div className="grow">
-            <div className="muted">本月支出</div>
+            <div className="muted">{t('stats.monthExpense')}</div>
             <div style={{ fontSize: 24, fontWeight: 700 }} className="mono">
               {formatCents(totals.expense)}
             </div>
           </div>
           <div className="grow">
-            <div className="muted">本月收入</div>
+            <div className="muted">{t('stats.monthIncome')}</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--green)' }} className="mono">
               {formatCents(totals.income)}
             </div>
           </div>
         </div>
         <div className="muted" style={{ marginTop: 12 }}>
-          日均支出 {formatCents(Math.round(avg))}
-          {byCategory.length > 0 ? ` · 最大一笔分类是 ${catMap.get(byCategory[0].categoryId ?? '')?.name ?? '未分类'}` : ''}
+          {t('stats.avg', { amount: formatCents(Math.round(avg)) })}
+          {byCategory.length > 0
+            ? ` · ${t('stats.largest', {
+                name: catMap.get(byCategory[0].categoryId ?? '')?.name ?? t('common.uncategorized'),
+              })}`
+            : ''}
         </div>
       </section>
 
-      <div className="section-title">近 6 个月趋势</div>
+      <div className="section-title">{t('stats.trend')}</div>
       <section className="card">
         {/*
           柱子用 SVG 画（preserveAspectRatio="none" 才能随宽度自由拉伸），
           但文字不能放在里面 —— 非等比缩放会把字压扁或拉宽。
           所以月份和金额改成下面的 HTML 行来排版。
         */}
-        <svg className="chart" viewBox="0 0 320 110" preserveAspectRatio="none" role="img" aria-label="近六个月收支趋势">
+        <svg className="chart" viewBox="0 0 320 110" preserveAspectRatio="none" role="img" aria-label={t('stats.chartAria')}>
           {[0, 1, 2, 3].map((i) => {
             const y = 6 + (i * 100) / 3;
             return (
               <line key={i} x1="0" x2="320" y1={y} y2={y} stroke="var(--line)" strokeWidth="0.6" strokeDasharray="2 3" />
             );
           })}
-          {trend.map((t, i) => {
+          {trend.map((point, i) => {
             const w = 320 / trend.length;
             const bw = Math.min(16, w / 3);
-            const hExp = (t.expense / maxTrend) * 100;
-            const hInc = (t.income / maxTrend) * 100;
+            const hExp = (point.expense / maxTrend) * 100;
+            const hInc = (point.income / maxTrend) * 100;
             return (
-              <g key={t.month}>
+              <g key={point.month}>
                 <rect x={i * w + w / 2 - bw - 2} y={106 - hExp} width={bw} height={Math.max(1, hExp)} rx="3" fill="#ef8a4b" />
                 <rect x={i * w + w / 2 + 2} y={106 - hInc} width={bw} height={Math.max(1, hInc)} rx="3" fill="#4cc38a" opacity="0.85" />
               </g>
@@ -130,28 +134,28 @@ export default function Stats() {
           })}
         </svg>
         <div className="chart-axis" style={{ gridTemplateColumns: `repeat(${trend.length}, 1fr)` }}>
-          {trend.map((t) => (
-            <div key={t.month}>
-              <div className="m">{Number(t.month.slice(5))}月</div>
-              <div className="v">{t.expense > 0 ? formatCentsCompact(t.expense) : '—'}</div>
+          {trend.map((point) => (
+            <div key={point.month}>
+              <div className="m">{t('stats.monthLabel', { m: Number(point.month.slice(5)) })}</div>
+              <div className="v">{point.expense > 0 ? formatCentsCompact(point.expense) : '—'}</div>
             </div>
           ))}
         </div>
         <div className="heat-legend">
           <span>
-            <i style={{ background: '#ef8a4b' }} /> 支出
+            <i style={{ background: '#ef8a4b' }} /> {t('stats.legendExpense')}
           </span>
           <span>
-            <i style={{ background: '#4cc38a' }} /> 收入
+            <i style={{ background: '#4cc38a' }} /> {t('stats.legendIncome')}
           </span>
         </div>
       </section>
 
-      <div className="section-title">分类排行</div>
+      <div className="section-title">{t('stats.categoryRank')}</div>
       <section className="card">
         {byCategory.length === 0 ? (
           <div className="empty" style={{ padding: '22px 0' }}>
-            本月还没有支出记录
+            {t('stats.noExpenseMonth')}
           </div>
         ) : (
           byCategory.map((row) => {
@@ -159,7 +163,7 @@ export default function Stats() {
             return (
               <div className="bar-row" key={row.categoryId ?? 'none'}>
                 <div className="bar-label">
-                  {cat?.icon ?? '🏷️'} {cat?.name ?? '未分类'}
+                  {cat?.icon ?? '🏷️'} {cat?.name ?? t('common.uncategorized')}
                 </div>
                 <div className="bar-track">
                   <div
@@ -180,11 +184,11 @@ export default function Stats() {
         )}
       </section>
 
-      <div className="section-title">日历视图</div>
+      <div className="section-title">{t('stats.calendar')}</div>
       <section className="card">
         <div className="heatmap" style={{ marginBottom: 6 }}>
-          {WEEK.map((w) => (
-            <div key={w} style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-faint)' }}>
+          {dict.weekShort.map((w, i) => (
+            <div key={`w-${i}`} style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-faint)' }}>
               {w}
             </div>
           ))}
@@ -196,22 +200,26 @@ export default function Stats() {
               key={d.key}
               className="heat-cell"
               style={{ background: heatColor(d.amount) }}
-              title={d.amount > 0 ? `${d.key} 支出 ${formatCents(d.amount)}` : `${d.key} 无支出`}
+              title={
+                d.amount > 0
+                  ? `${d.key} ${t('dashboard.dayExpense', { amount: formatCents(d.amount) })}`
+                  : d.key
+              }
             >
               {d.day}
             </div>
           ))}
         </div>
         <div className="heat-legend">
-          <span>少</span>
+          <span>{t('stats.less')}</span>
           {['rgba(239,138,75,0.22)', 'rgba(239,138,75,0.45)', 'rgba(239,138,75,0.72)', '#ef8a4b'].map((c) => (
             <i key={c} style={{ background: c }} />
           ))}
-          <span>多</span>
+          <span>{t('stats.more')}</span>
         </div>
       </section>
 
-      <div className="section-title">支出最高的几天</div>
+      <div className="section-title">{t('stats.topDays')}</div>
       <section className="card">
         {days
           .filter((d) => d.amount > 0)
@@ -220,7 +228,8 @@ export default function Stats() {
           .map((d) => (
             <div className="row" key={d.key} style={{ padding: '7px 0', borderBottom: '1px solid var(--line-soft)' }}>
               <span className="grow">
-                {Number(d.key.slice(5, 7))}/{d.day} · 周{WEEK[weekdayOf(d.key)]}
+                {Number(d.key.slice(5, 7))}/{d.day} ·{' '}
+                {t('stats.weekday', { day: dict.weekShort[weekdayOf(d.key)] })}
               </span>
               <span className="mono" style={{ fontWeight: 600 }}>
                 {formatCents(d.amount)}
@@ -229,7 +238,7 @@ export default function Stats() {
           ))}
         {days.every((d) => d.amount === 0) ? (
           <div className="empty" style={{ padding: '18px 0' }}>
-            这个月还没有支出
+            {t('stats.noExpenseAtAll')}
           </div>
         ) : null}
       </section>

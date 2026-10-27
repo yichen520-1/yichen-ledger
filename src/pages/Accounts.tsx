@@ -1,17 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useLedger } from '../state/LedgerContext';
+import { useI18n, useErrorText } from '../i18n';
 import { useToast } from '../components/Toast';
+import { Sheet } from '../components/Sheet';
 import { deleteAccount, saveAccount } from '../db/repository';
 import { accountBalance, formatCents, newId, parseAmountToCents, type Account, type AccountKind } from '../domain/model';
-
-const KINDS: Array<[AccountKind, string, string]> = [
-  ['cash', '现金', '💵'],
-  ['wallet', '电子钱包', '📱'],
-  ['bank', '银行卡', '🏦'],
-  ['credit', '信用卡', '💳'],
-  ['investment', '投资', '📈'],
-];
 
 const ICON: Record<AccountKind, string> = {
   cash: '💵',
@@ -24,12 +18,24 @@ const ICON: Record<AccountKind, string> = {
 export default function Accounts() {
   const { accounts, transactions } = useLedger();
   const toast = useToast();
+  const { t } = useI18n();
+  const errorText = useErrorText();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Account | null>(null);
   const [name, setName] = useState('');
   const [kind, setKind] = useState<AccountKind>('cash');
   const [balanceText, setBalanceText] = useState('');
   const [includeInTotal, setIncludeInTotal] = useState(true);
+
+  // 类型选项的形状保持不变（[kind, 标签, emoji]），只有标签走词条：
+  // 放在组件里才能跟着当前语言重算，emoji 与逻辑都不受影响。
+  const KINDS: Array<[AccountKind, string, string]> = [
+    ['cash', t('accounts.kinds.cash'), '💵'],
+    ['wallet', t('accounts.kinds.wallet'), '📱'],
+    ['bank', t('accounts.kinds.bank'), '🏦'],
+    ['credit', t('accounts.kinds.credit'), '💳'],
+    ['investment', t('accounts.kinds.investment'), '📈'],
+  ];
 
   const rows = useMemo(
     () =>
@@ -61,9 +67,9 @@ export default function Accounts() {
   }
 
   async function save() {
-    if (!name.trim()) return toast('请填写账户名称');
+    if (!name.trim()) return toast(t('accounts.nameRequired'));
     const cents = parseAmountToCents(balanceText || '0');
-    if (cents === null) return toast('初始余额格式不正确');
+    if (cents === null) return toast(t('accounts.balanceInvalid'));
     const account: Account = {
       id: editing?.id ?? newId('acc-'),
       name: name.trim(),
@@ -77,21 +83,21 @@ export default function Accounts() {
     };
     await saveAccount(account);
     setOpen(false);
-    toast(editing ? '已保存' : '账户已添加');
+    toast(editing ? t('add.saved') : t('accounts.added'));
   }
 
   async function toggleArchive(a: Account) {
     await saveAccount({ ...a, archived: !a.archived });
-    toast(a.archived ? '已恢复' : '已归档（余额不计入总资产，但历史账目保留）');
+    toast(a.archived ? t('accounts.unarchivedToast') : t('accounts.archivedToast'));
   }
 
   async function remove(a: Account) {
-    if (!window.confirm(`删除账户「${a.name}」？只有没有账目的账户才能删除。`)) return;
+    if (!window.confirm(t('accounts.confirmDelete', { name: a.name }))) return;
     try {
       await deleteAccount(a.id);
-      toast('已删除');
+      toast(t('common.delete'));
     } catch (e) {
-      toast(e instanceof Error ? e.message : '删除失败');
+      toast(errorText(e));
     }
   }
 
@@ -99,18 +105,18 @@ export default function Accounts() {
     <>
       <div className="page-head">
         <div>
-          <h1 className="page-title">账户</h1>
-          <div className="page-sub">合计 {formatCents(total)}</div>
+          <h1 className="page-title">{t('accounts.title')}</h1>
+          <div className="page-sub">{t('accounts.sub', { total: formatCents(total) })}</div>
         </div>
         <button className="btn primary" onClick={openNew}>
           <Plus size={15} />
-          添加
+          {t('accounts.add')}
         </button>
       </div>
 
       <section className="card" style={{ padding: '4px 14px' }}>
         {rows.length === 0 ? (
-          <div className="empty">还没有账户</div>
+          <div className="empty">{t('accounts.empty')}</div>
         ) : (
           rows.map(({ account, balance }) => (
             <div
@@ -123,11 +129,11 @@ export default function Accounts() {
               <div className="tx-body">
                 <div className="tx-title">
                   {account.name}
-                  {account.archived ? <span className="muted"> · 已归档</span> : null}
+                  {account.archived ? <span className="muted"> · {t('accounts.archived')}</span> : null}
                 </div>
                 <div className="tx-meta">
                   {KINDS.find((k) => k[0] === account.kind)?.[1]}
-                  {account.includeInTotal ? '' : ' · 不计入总资产'}
+                  {account.includeInTotal ? '' : ` · ${t('accounts.excluded')}`}
                 </div>
               </div>
               <div className="tx-amount" style={{ color: balance < 0 ? 'var(--red)' : 'var(--text)' }}>
@@ -139,64 +145,68 @@ export default function Accounts() {
       </section>
 
       <div className="muted" style={{ marginTop: 14, paddingLeft: 4 }}>
-        账户余额 = 初始余额 + 收入 − 支出 ± 转账。点账户可修改初始余额。
+        {t('accounts.hint')}
       </div>
 
-      {open ? (
-        <div className="sheet-mask" onClick={() => setOpen(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <h3>{editing ? '编辑账户' : '添加账户'}</h3>
-            <div className="field">
-              <label>名称</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="比如 招商银行" maxLength={20} />
-            </div>
-            <div className="field">
-              <label>类型</label>
-              <select value={kind} onChange={(e) => setKind(e.target.value as AccountKind)}>
-                {KINDS.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label>初始余额</label>
-              <input
-                inputMode="decimal"
-                value={balanceText}
-                onChange={(e) => setBalanceText(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-            <div className="field">
-              <label>总资产</label>
-              <select value={includeInTotal ? '1' : '0'} onChange={(e) => setIncludeInTotal(e.target.value === '1')}>
-                <option value="1">计入总资产</option>
-                <option value="0">不计入（比如临时账户）</option>
-              </select>
-            </div>
-            <div className="row" style={{ marginTop: 18 }}>
-              <button className="btn grow" onClick={() => setOpen(false)}>
-                取消
-              </button>
-              <button className="btn primary grow" onClick={save}>
-                保存
-              </button>
-            </div>
-            {editing ? (
-              <div className="row" style={{ marginTop: 10 }}>
-                <button className="btn grow" onClick={() => toggleArchive(editing)}>
-                  {editing.archived ? '恢复账户' : '归档账户'}
-                </button>
-                <button className="btn danger grow" onClick={() => remove(editing)}>
-                  删除
-                </button>
-              </div>
-            ) : null}
-          </div>
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editing ? t('accounts.sheetEdit') : t('accounts.sheetNew')}
+      >
+        <div className="field">
+          <label>{t('accounts.name')}</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('accounts.namePlaceholder')}
+            maxLength={20}
+          />
         </div>
-      ) : null}
+        <div className="field">
+          <label>{t('accounts.kind')}</label>
+          <select value={kind} onChange={(e) => setKind(e.target.value as AccountKind)}>
+            {KINDS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>{t('accounts.initialBalance')}</label>
+          <input
+            inputMode="decimal"
+            value={balanceText}
+            onChange={(e) => setBalanceText(e.target.value)}
+            placeholder="0.00"
+          />
+        </div>
+        <div className="field">
+          <label>{t('accounts.inTotal')}</label>
+          <select value={includeInTotal ? '1' : '0'} onChange={(e) => setIncludeInTotal(e.target.value === '1')}>
+            <option value="1">{t('accounts.yesTotal')}</option>
+            <option value="0">{t('accounts.noTotal')}</option>
+          </select>
+        </div>
+        <div className="row" style={{ marginTop: 18 }}>
+          <button className="btn grow" onClick={() => setOpen(false)}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn primary grow" onClick={save}>
+            {t('common.save')}
+          </button>
+        </div>
+        {editing ? (
+          <div className="row" style={{ marginTop: 10 }}>
+            <button className="btn grow" onClick={() => toggleArchive(editing)}>
+              {editing.archived ? t('accounts.unarchive') : t('accounts.archive')}
+            </button>
+            <button className="btn danger grow" onClick={() => remove(editing)}>
+              {t('common.delete')}
+            </button>
+          </div>
+        ) : null}
+      </Sheet>
     </>
   );
 }

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, seedIfEmpty } from '../db';
 import type { Account, Budget, Category, Transaction } from '../domain/model';
+import { useI18n } from '../i18n';
 
 interface LedgerState {
   ready: boolean;
@@ -25,6 +26,8 @@ const Ctx = createContext<LedgerState | null>(null);
  *   任何一处写库，所有页面自动刷新（无需手动刷新/Redux）。
  */
 export function LedgerProvider({ children }: { children: ReactNode }) {
+  // 账户被删掉以后，账目上还留着它的 id；这时显示的名字也要跟着界面语言变
+  const { t } = useI18n();
   const [seeded, setSeeded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,10 +62,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       categories: catList.slice().sort((a, b) => a.sort - b.sort),
       transactions: transactions ?? [],
       budgets: budgets ?? [],
-      accountName: (id) => (id ? accMap.get(id) ?? '已删除账户' : ''),
+      accountName: (id) => (id ? accMap.get(id) ?? t('common.deletedAccount') : ''),
       categoryOf: (id) => (id ? catMap.get(id) : undefined),
     };
-  }, [ready, loading, error, accounts, categories, transactions, budgets]);
+  }, [ready, loading, error, accounts, categories, transactions, budgets, t]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
