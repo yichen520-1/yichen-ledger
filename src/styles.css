@@ -114,12 +114,30 @@ textarea {
   width: 34px;
   height: 34px;
   border-radius: 11px;
-  background: linear-gradient(140deg, #ffc978, #ef8a4b);
+  /* 和图标的配色对齐：宣纸底 + 焦墨「忆」+ 右下角一粒朱砂 */
+  background: linear-gradient(160deg, #fbf7ee, #ece3d3);
   display: grid;
   place-items: center;
-  font-size: 18px;
-  color: #2a1500;
-  font-weight: 700;
+  font-family: 'STXingkai', '华文行楷', 'KaiTi', '楷体', 'Xingkai SC', serif;
+  font-size: 21px;
+  line-height: 1;
+  color: #141210;
+  font-weight: 600;
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+/* 那枚朱红小印：侧边栏只有 34px，画成一个点就够了 */
+.brand-mark::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: #c42c22;
+  box-shadow: 0 0 0 1px rgba(196, 44, 34, 0.35);
 }
 
 .brand-text strong {
