@@ -93,11 +93,20 @@ try {
   const manifest = await page.$eval('link[rel="manifest"]', (el) => el.href).catch(() => null);
   check(!!manifest, 'manifest 链接存在', manifest || '');
 
+  // Service Worker 是在页面加载完之后才注册的，刚 goto 完就问会拿到
+  // 「registration 有、active 还没有」，多等一会儿再判，别把正常安装当失败。
   const sw = await page.evaluate(async () => {
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 15000));
+    const ready = await Promise.race([navigator.serviceWorker.ready, timeout]);
+    if (ready && ready.active) return ready.active.state;
     const r = await navigator.serviceWorker.getRegistration();
-    return r ? (r.active ? r.active.state : 'no-active') : 'none';
+    return r ? (r.active ? r.active.state : r.installing ? 'installing' : 'no-active') : 'none';
   });
-  check(sw === 'activated' || sw === 'activating', 'Service Worker 已注册', sw);
+  check(
+    sw === 'activated' || sw === 'activating' || sw === 'installing',
+    'Service Worker 已注册',
+    sw,
+  );
 
   check(errors.length === 0, '没有控制台错误', errors.slice(0, 3).join(' | '));
 
