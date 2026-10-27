@@ -129,6 +129,7 @@ export default function SettingsPage() {
 
       <div className="section-title">数据备份</div>
       <section className="card">
+        <div className="privacy-line">数据只存在你自己的设备上</div>
         <div className="muted" style={{ marginBottom: 12 }}>
           所有数据都存在这台设备的 IndexedDB 里，不上传任何服务器。换设备时用「完整备份」搬家。
         </div>

@@ -30,7 +30,7 @@ function Shell() {
           <div className="brand-mark">忆</div>
           <div className="brand-text">
             <strong>忆尘记账</strong>
-            <span>数据只存在你自己的设备上</span>
+            <span>所记皆来路，所忆皆无尘</span>
           </div>
         </div>
         <NavLink to="/add" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>

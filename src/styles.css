@@ -131,6 +131,11 @@ textarea {
 .brand-text span {
   font-size: 11px;
   color: var(--text-faint);
+  letter-spacing: 0.06em;
+  /* 标语比正文更需要呼吸：行距拉开一点，像题在画边的款识 */
+  line-height: 1.7;
+  display: block;
+  margin-top: 1px;
 }
 
 .nav-item {
@@ -786,6 +791,27 @@ textarea {
 .muted {
   color: var(--text-faint);
   font-size: 12.5px;
+}
+
+/* 「我的 → 数据备份」里的一行小字：从侧边栏搬过来的那句承诺。
+   前面加一道琥珀短竖，当作一枚小小的书签。 */
+.privacy-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 0.045em;
+  margin-bottom: 7px;
+}
+
+.privacy-line::before {
+  content: '';
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.75;
 }
 
 .mono {
