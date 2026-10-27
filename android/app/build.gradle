@@ -7,8 +7,10 @@ android {
         applicationId "com.yichen.ledger"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // 和 package.json 的 version 保持一致。versionCode 每发一次版加一，
+        // 否则新包装不到旧包上（Android 会报 INSTALL_FAILED_VERSION_DOWNGRADE）。
+        versionCode 2
+        versionName "0.1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
