@@ -25,7 +25,7 @@ async function goto(page, hash) {
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: 'new',
-  args: ['--disable-gpu', '--hide-scrollbars'],
+  args: ['--disable-gpu', '--hide-scrollbars', '--lang=zh-CN'],
 });
 
 try {

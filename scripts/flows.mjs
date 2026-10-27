@@ -23,7 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: 'new',
-  args: ['--disable-gpu', '--hide-scrollbars'],
+  args: ['--disable-gpu', '--hide-scrollbars', '--lang=zh-CN'],
 });
 
 try {
@@ -43,6 +43,7 @@ try {
   const newBtn = await page.$$('.page-head button');
   await newBtn[0].click();
   await page.waitForSelector('.sheet', { timeout: 5000 });
+  await sleep(560); // 等入场动画结束，动画期间输入框还在屏幕外
   // sheet 里只有「金额」一个 input（分类和周期是 select）
   const inputs = await page.$$('.sheet input');
   await inputs[0].click({ clickCount: 3 });
@@ -79,6 +80,7 @@ try {
   const addBtn = (await page.$$('.page-head button'))[0];
   await addBtn.click();
   await page.waitForSelector('.sheet', { timeout: 5000 });
+  await sleep(560); // 等入场动画结束，动画期间输入框还在屏幕外
   const accInputs = await page.$$('.sheet input');
   await accInputs[0].click({ clickCount: 3 });
   await accInputs[0].type('招商银行');
@@ -144,6 +146,7 @@ try {
   const catAdd = (await page.$$('.page-head button'))[0];
   await catAdd.click();
   await page.waitForSelector('.sheet', { timeout: 5000 });
+  await sleep(560); // 等入场动画结束，动画期间输入框还在屏幕外
   const catInputs = await page.$$('.sheet input');
   await catInputs[0].click({ clickCount: 3 });
   await catInputs[0].type('咖啡');

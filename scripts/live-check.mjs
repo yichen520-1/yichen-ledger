@@ -20,7 +20,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: 'new',
-  args: ['--no-sandbox', '--disable-gpu'],
+  args: ['--no-sandbox', '--disable-gpu', '--lang=zh-CN'],
 });
 
 try {
