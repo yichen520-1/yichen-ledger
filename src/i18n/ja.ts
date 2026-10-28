@@ -386,6 +386,7 @@ export const ja: Dict = {
     searchPlaceholder: 'タイトル・メモ・場所・タグを検索',
     searchEmpty: '該当する予定がありません',
     deleteConfirm: '「{title}」を削除しますか？',
+    deleteConfirmSeries: 'これは繰り返しの予定です。シリーズ全体（{title}）を削除します。よろしいですか？',
     saved: '保存しました',
     created: '予定を作成しました',
     deleted: '削除しました',

@@ -539,7 +539,10 @@ function EventSheet({
 
   async function remove() {
     if (!initial) return;
-    if (!window.confirm(t('schedule.deleteConfirm', { title: initial.title || t('schedule.untitled') }))) return;
+    // 重复日程删的是整串，得说清楚，别让人以为只删这一次
+    const recurring = initial.recurrence.freq !== 'none';
+    const key = recurring ? 'schedule.deleteConfirmSeries' : 'schedule.deleteConfirm';
+    if (!window.confirm(t(key, { title: initial.title || t('schedule.untitled') }))) return;
     setBusy(true);
     try {
       await deleteEvent(initial.id);

@@ -386,6 +386,7 @@ export const en: Dict = {
     searchPlaceholder: 'Search title, notes, location, tag',
     searchEmpty: 'No matching events',
     deleteConfirm: 'Delete “{title}”?',
+    deleteConfirmSeries: 'This repeats — deleting it removes the whole series ({title}). Continue?',
     saved: 'Saved',
     created: 'Event created',
     deleted: 'Deleted',

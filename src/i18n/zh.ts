@@ -396,6 +396,7 @@ export const zh = {
     searchPlaceholder: '搜标题、备注、地点、标签',
     searchEmpty: '没找到相关日程',
     deleteConfirm: '删掉「{title}」？',
+    deleteConfirmSeries: '这是重复日程，删掉会把整串（{title}）一起删掉，确定吗？',
     saved: '已保存',
     created: '已新建日程',
     deleted: '已删除',
