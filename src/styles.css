@@ -60,6 +60,8 @@
 
   /* 遮罩、提示条、气泡这些散落的颜色，浅色下要整体换掉 */
   --scrim: rgba(0, 0, 0, 0.58);
+  /* 玻璃弹层用的浅遮罩：全黑会把玻璃压成一块黑玻璃 */
+  --scrim-soft: rgba(6, 9, 14, 0.34);
   --toast-bg: rgba(38, 45, 56, 0.96);
   --fab-bg: linear-gradient(160deg, #2a2013, #1a1f27 70%);
   --warn-text: #ffd9a8;
@@ -511,6 +513,11 @@ textarea {
   position: relative;
   z-index: 1;
   display: flex;
+  /*
+   * 左右各留 6px：导航条现在是大圆角的玻璃，贴着边的那两个图标
+   * （总览、功能切换钮）会被圆角的弧线切掉一角。留一点内边距就避开了。
+   */
+  padding: 0 6px;
 }
 
 .tab {
@@ -1657,6 +1664,12 @@ textarea {
   background: transparent;
   border: 0;
   flex: 0 0 auto;
+  /*
+   * 导航条高度由两侧的 .tab 撑起来（图标 + 文字 ≈ 56px），而这里只有
+   * 30px 高的两个图标。不居中就会贴着顶边，看起来像漏了一截。
+   */
+  display: flex;
+  align-items: center;
 }
 
 .mode-switch.compact .mode-switch-track {
@@ -2278,9 +2291,14 @@ select.input {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: var(--scrim);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  /*
+   * 这一层比通用遮罩浅得多（通用是 0.58）。
+   * 忆小尘的面板是玻璃，背后要是全黑，它就只是一块黑玻璃 —— 看起来跟
+   * 用户抱怨的「黑框」没区别。让页面的颜色透上来，玻璃才有东西可折射。
+   */
+  background: var(--scrim-soft);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -2304,6 +2322,13 @@ select.input {
     justify-content: flex-end;
     padding: 0 30px 30px 0;
     background: transparent;
+    /*
+     * 桌面上忆小尘是右下角一张卡片，不是全屏抽屉。
+     * 遮罩铺满整屏时那层 blur(6px) 会把整个工作区糊掉 —— 用户只是想让
+     * 助手在旁边待着，账本还得看得清。这里必须把模糊关掉。
+     */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     pointer-events: none;
   }
 

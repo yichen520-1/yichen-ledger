@@ -50,7 +50,7 @@ function Shell() {
   const { ready, error } = useLedger();
   const { t } = useI18n();
   const { mode, setMode } = useMode();
-  const { show: showAssistant } = useAssistantUi();
+  const { open: assistantOpen, show: showAssistant } = useAssistantUi();
   const location = useLocation();
   const navigate = useNavigate();
   const isAdd = location.pathname.startsWith('/add') || location.pathname.startsWith('/edit');
@@ -204,7 +204,8 @@ function Shell() {
         </div>
       </main>
 
-      {showFab ? <AssistantFab onOpen={showAssistant} /> : null}
+      {/* 面板开着时把入口藏掉：面板是玻璃，按钮会在底下透出来 */}
+      {showFab && !assistantOpen ? <AssistantFab onOpen={showAssistant} /> : null}
 
       {!isAdd ? (
         <nav className="tabbar has-backdrop">
