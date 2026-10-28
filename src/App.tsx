@@ -15,6 +15,9 @@ import { ModeProvider, useMode, type AppMode } from './state/ModeContext';
 import { I18nProvider, useI18n, type DictKey } from './i18n';
 import { ToastProvider } from './components/Toast';
 import { Backdrop } from './components/Backdrop';
+import { AssistantProvider } from './state/AssistantContext';
+import { AssistantHost, useAssistantUi } from './components/AssistantHost';
+import { AssistantFab } from './components/AssistantPanel';
 import { db } from './db';
 import Dashboard from './pages/Dashboard';
 import Add from './pages/Add';
@@ -47,10 +50,21 @@ function Shell() {
   const { ready, error } = useLedger();
   const { t } = useI18n();
   const { mode, setMode } = useMode();
+  const { show: showAssistant } = useAssistantUi();
   const location = useLocation();
   const navigate = useNavigate();
   const isAdd = location.pathname.startsWith('/add') || location.pathname.startsWith('/edit');
   const isSchedule = mode === 'schedule';
+
+  /**
+   * 忆小尘的入口放在哪几页
+   * ------------------------------------------------------------------
+   * 只放三页：总览、统计（管钱），日程（管时间）。
+   * 不放记账页——那里正在填表单，右下角再飘一个按钮会挡住数字键盘；
+   * 也不放设置页，那里没有「问一句」的场景。
+   */
+  const showFab =
+    ready && (location.pathname === '/' || location.pathname === '/stats' || location.pathname === '/schedule');
 
   // 判断方向：新页面在导航顺序里更靠后 → 从右推入（forward），否则从左（back）
   const index = ORDER.indexOf(location.pathname);
@@ -189,6 +203,8 @@ function Shell() {
         </div>
       </main>
 
+      {showFab ? <AssistantFab onOpen={showAssistant} /> : null}
+
       {!isAdd ? (
         <nav className="tabbar has-backdrop">
           <Backdrop region="tabbar" />
@@ -283,7 +299,11 @@ export default function App() {
         <ToastProvider>
           <LedgerProvider>
             <ModeProvider>
-              <Shell />
+              <AssistantProvider>
+                <AssistantHost>
+                  <Shell />
+                </AssistantHost>
+              </AssistantProvider>
             </ModeProvider>
           </LedgerProvider>
         </ToastProvider>
