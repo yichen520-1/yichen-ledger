@@ -7,7 +7,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 const config: CapacitorConfig = {
   appId: 'com.yichen.ledger',
-  appName: '忆尘记账',
+  appName: '忆笺记账',
   webDir: 'dist',
   android: {
     allowMixedContent: false,

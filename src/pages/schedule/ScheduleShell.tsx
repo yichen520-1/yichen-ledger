@@ -8,7 +8,7 @@ import Schedule from '../Schedule';
 import { TimetablePage } from './TimetablePage';
 
 /**
- * 「忆尘日程」这一页里装两样东西：日程与课表。
+ * 「忆笺日程」这一页里装两样东西：日程与课表。
  *
  * 为什么这两件事在同一个 App 里：
  *   它们共用同一个心智（「我什么时候要做什么」），拆成两个 App 反而

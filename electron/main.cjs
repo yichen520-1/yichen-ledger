@@ -18,7 +18,7 @@ function createWindow() {
     minWidth: 720,
     minHeight: 520,
     backgroundColor: '#0f1216',
-    title: '忆尘记账',
+    title: '忆笺记账',
     autoHideMenuBar: true,
     // macOS 上把红绿灯按钮嵌进内容区，视觉上和网页版头部更贴合
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',

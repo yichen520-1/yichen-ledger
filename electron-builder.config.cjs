@@ -12,7 +12,7 @@ const os = require('node:os');
 
 /**
  * NSIS 在生成卸载程序时会执行一次自己产出的安装包，
- * 如果**目录路径**里有中文（本项目就放在「忆尘记账」这种中文目录下），
+ * 如果**目录路径**里有中文（本项目就放在「忆笺记账」这种中文目录下），
  * 这一步会失败并报 `process failed 2`。文件名带中文没有问题，只有目录路径有影响。
  * 所以这里检测一下：路径有非 ASCII 字符就把产物丢到系统临时目录。
  */
@@ -30,7 +30,7 @@ module.exports = {
   appId: 'com.yichen.ledger',
   // productName 是「显示名」：窗口标题、开始菜单/桌面快捷方式、macOS 启动台与 Dock、
   // Linux 应用菜单、控制面板「应用和功能」里看到的都是它 —— 所以保持中文。
-  productName: '忆尘记账',
+  productName: '忆笺记账',
   /**
    * executableName 是「文件名」：程序目录名、可执行文件名都用它 —— 所以必须是纯 ASCII。
    *
@@ -41,7 +41,7 @@ module.exports = {
    *   （见 app-builder-lib/out/targets/targetUtil.js 的 getWindowsInstallationDirName），
    *   所以只改这一处就能让 `%LOCALAPPDATA%\Programs\yichen-ledger` 落地。
    * - macOS 的 .app 目录名同样取 productFilename，而 CFBundleName / CFBundleDisplayName
-   *   取 productName，于是 Finder 里看到「忆尘记账」，磁盘上却是 yichen-ledger.app。
+   *   取 productName，于是 Finder 里看到「忆笺记账」，磁盘上却是 yichen-ledger.app。
    * - Linux 的 AppImage 可执行文件与解包目录同理，desktop 条目 Name 仍取 productName。
    *
    * 注意：Electron 的 userData 目录取的是 package.json 的 name（本来就是 yichen-ledger），
@@ -69,7 +69,7 @@ module.exports = {
     signAndEditExecutable: true,
     // 产物文件名用纯 ASCII：GitHub Release 会把资产名里的非 ASCII 字符
     // 统统替换成「.」，用中文名上传上去就变成 "-0.1.0.exe" 这种残废名字。
-    // 安装后显示的名字、快捷方式、窗口标题仍然是「忆尘记账」，不受影响。
+    // 安装后显示的名字、快捷方式、窗口标题仍然是「忆笺记账」，不受影响。
     artifactName: 'yichen-ledger-${version}-win-${arch}.${ext}',
   },
 
@@ -79,7 +79,7 @@ module.exports = {
     allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    shortcutName: '忆尘记账',
+    shortcutName: '忆笺记账',
     // 卸载时保留用户数据（IndexedDB 存在用户目录里，本来也不会被删）
     deleteAppDataOnUninstall: false,
   },

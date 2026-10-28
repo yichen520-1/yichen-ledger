@@ -177,7 +177,7 @@ export async function listBudgets(): Promise<Budget[]> {
   return db.budgets.toArray();
 }
 
-/* ---------------------------------------------------------------- 忆尘日程 */
+/* ---------------------------------------------------------------- 忆笺日程 */
 
 /** 日程草稿：新建/编辑时表单填的东西 */
 export interface EventDraft {

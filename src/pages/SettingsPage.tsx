@@ -164,14 +164,14 @@ export default function SettingsPage() {
   async function doExportBackup() {
     const text = await exportBackup();
     const stamp = new Date().toISOString().slice(0, 10);
-    download(`忆尘记账备份-${stamp}.json`, text, 'application/json');
+    download(`忆笺记账备份-${stamp}.json`, text, 'application/json');
     toast(t('settings.backupDone'));
   }
 
   async function doExportCsv() {
     const text = await exportCsvText();
     const stamp = new Date().toISOString().slice(0, 10);
-    download(`忆尘记账-${stamp}.csv`, text, 'text/csv;charset=utf-8');
+    download(`忆笺记账-${stamp}.csv`, text, 'text/csv;charset=utf-8');
     toast(t('settings.csvDone'));
   }
 

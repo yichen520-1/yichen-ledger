@@ -6,7 +6,7 @@ import type { Dict } from './zh';
  */
 export const ja: Dict = {
   app: {
-    name: '憶塵記帳',
+    name: '憶箋記帳',
     tagline: '記すは来し方、憶うは塵なきこと',
     localFirst: 'ローカル優先',
   },
@@ -324,7 +324,7 @@ export const ja: Dict = {
     accountInUse: 'この口座には記録があるため削除できません。「保管」にしてください',
     categoryInUse: 'このカテゴリには記録があるため削除できません',
     builtinCategory: '標準カテゴリは削除できません',
-    backupInvalid: '有効な憶塵記帳のバックアップファイルではありません',
+    backupInvalid: '有効な憶箋記帳のバックアップファイルではありません',
     csvEmpty: 'CSV にデータ行がありません',
     csvHeader: '見出しには「日付」「種類」「金額」の 3 列が必要です',
     eventTitleRequired: '予定にタイトルを付けてください',
@@ -339,12 +339,12 @@ export const ja: Dict = {
   mode: {
     ledger: '家計簿',
     schedule: '予定',
-    ledgerApp: '憶塵家計簿',
-    scheduleApp: '憶塵スケジュール',
+    ledgerApp: '憶箋家計簿',
+    scheduleApp: '憶箋スケジュール',
   },
 
   schedule: {
-    title: '憶塵スケジュール',
+    title: '憶箋スケジュール',
     tagline: '行く先には、いつも時がある',
     tabSchedule: '予定',
     tabTimetable: '時間割',
@@ -579,7 +579,7 @@ export const ja: Dict = {
       greetingEvening: 'こんばんは。今日は疲れましたか。',
       greetingNight: 'まだ起きていますか。ここにいますよ、何でも話してください。',
       identity:
-        '憶小塵です。「憶塵記帳」の中のアシスタントで、お金と予定の両方を見ています。それ以外の話も大丈夫です。',
+        '憶小塵です。「憶箋記帳」の中のアシスタントで、お金と予定の両方を見ています。それ以外の話も大丈夫です。',
       capability:
         'できることはこちら：\n· 数字 — 今月いくら使った、一番多い分類、予算の残り、口座残高\n· 記録 — 「昼食 25 を記録」と言えば、確認用に整えます\n· 予定 — 今週の予定、空き時間、予定の追加\n· 雑談 — 気分、天気、ちょっとした計算など',
       thanks: 'どういたしまして。',

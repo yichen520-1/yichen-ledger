@@ -6,7 +6,7 @@ import type { Dict } from './zh';
  */
 export const en: Dict = {
   app: {
-    name: 'Yichen Ledger',
+    name: 'Yijian Ledger',
     tagline: 'Every entry a path, every memory unmarred',
     localFirst: 'local first',
   },
@@ -297,7 +297,7 @@ export const en: Dict = {
       'A local-first personal ledger, running from one codebase on Android, iOS, Windows and macOS. All amounts are stored as integer cents, so nothing drifts.',
     viewOnline: 'Web version',
     viewSource: 'Project page',
-    aiTitle: 'AI key for Yichen',
+    aiTitle: 'AI key for Yijian',
     aiHint: 'Works without it: schedule photos use on-device OCR, the assistant uses local rules. Add a key to upgrade to cloud understanding.',
     aiProvider: 'Provider',
     aiProviderOpenai: 'OpenAI',
@@ -324,7 +324,7 @@ export const en: Dict = {
     accountInUse: 'This account already has entries, so it cannot be deleted. Archive it instead.',
     categoryInUse: 'This category already has entries, so it cannot be deleted',
     builtinCategory: 'Built-in categories cannot be deleted',
-    backupInvalid: 'This is not a valid Yichen Ledger backup file',
+    backupInvalid: 'This is not a valid Yijian Ledger backup file',
     csvEmpty: 'The CSV has no data rows',
     csvHeader: 'The header must contain Date, Type and Amount columns',
     eventTitleRequired: 'Give the event a title',
@@ -339,12 +339,12 @@ export const en: Dict = {
   mode: {
     ledger: 'Ledger',
     schedule: 'Schedule',
-    ledgerApp: 'Yichen Ledger',
-    scheduleApp: 'Yichen Schedule',
+    ledgerApp: 'Yijian Ledger',
+    scheduleApp: 'Yijian Schedule',
   },
 
   schedule: {
-    title: 'Yichen Schedule',
+    title: 'Yijian Schedule',
     tagline: 'Everything has its hour',
     tabSchedule: 'Schedule',
     tabTimetable: 'Timetable',
@@ -580,7 +580,7 @@ export const en: Dict = {
       greetingEvening: 'Evening. Long day?',
       greetingNight: "Still up? I'm here — say whatever is on your mind.",
       identity:
-        'I am Xiaochen, the assistant inside Yichen Ledger. I look after your money and your schedule — and I am happy to chat about other things too.',
+        'I am Xiaochen, the assistant inside Yijian Ledger. I look after your money and your schedule — and I am happy to chat about other things too.',
       capability:
         'Here is what I do:\n· Numbers — spending this month, biggest category, budget left, account balances\n· Recording — say “record lunch 25” and I will prepare it for your confirmation\n· Schedule — what is coming up, when you are free, adding events\n· Chat — mood, weather, quick math, whatever',
       thanks: 'Any time.',
