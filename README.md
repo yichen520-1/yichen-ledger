@@ -24,11 +24,11 @@
 
 | 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows | `yichen-ledger-0.4.0-win-x64.exe` | 安装版，可选安装目录 |
-| Windows | `yichen-ledger-0.4.0-win-x64.zip` | 免安装，解压即用 |
-| macOS（Apple 芯片） | `yichen-ledger-0.4.0-mac-arm64.dmg` | M1/M2/M3/M4 |
-| macOS（Intel） | `yichen-ledger-0.4.0-mac-x64.dmg` | 老款 Mac |
-| Linux | `yichen-ledger-0.4.0-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
+| Windows | `yichen-ledger-0.7.0-win-x64.exe` | 安装版，可选安装目录 |
+| Windows | `yichen-ledger-0.7.0-win-x64.zip` | 免安装，解压即用 |
+| macOS（Apple 芯片） | `yichen-ledger-0.7.0-mac-arm64.dmg` | M1/M2/M3/M4 |
+| macOS（Intel） | `yichen-ledger-0.7.0-mac-x64.dmg` | 老款 Mac |
+| Linux | `yichen-ledger-0.7.0-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
 | Android | `app-debug.apk` | 手机浏览器下载后点安装 |
 | iOS | `yichen-ledger-unsigned.ipa` | **未签名**，需自行重签，见下方说明 |
 
@@ -98,7 +98,7 @@
   对比度、饱和度、缩放、偏移、透明度、暗化、适配方式、水平翻转；外加全局字体风格、字号基准、
   文字颜色、强调色、圆角、玻璃面板
 - **iOS 手感**（v0.2.0）：页面横向 push/pop、列表交错淡入、按下回弹、弹层阻尼，尊重系统的「减少动态效果」
-- **忆尘日程**（v0.3.0）：侧边栏与底部导航的模式切换钮，一键在「记账 / 日程」之间换整个工作区；月 / 周 / 日三种视图；全天、时间区间、地点、标签、颜色、备注；每天 / 每周 / 每月 / 每年的重复规则（含自定义间隔与重复日）；勾选完成、搜索、删除
+- **忆尘日程**（v0.3.0）：侧边栏与底部导航的入口，一键在「记账 / 日程」之间换整个工作区（v0.7.0 起改成一枚并排的 App 图标）；月 / 周 / 日三种视图；全天、时间区间、地点、标签、颜色、备注；每天 / 每周 / 每月 / 每年的重复规则（含自定义间隔与重复日）；勾选完成、搜索、删除
 - **从图片建日程**（v0.3.0）：拍一张课程表或会议通知，填了 API Key 走云端多模态，没填就走本机 OCR（tesseract.js，第一次用要下语言包）
 - **到点提醒**（v0.3.0）：Android / iOS 走系统本地通知，App 关着也能弹；网页版退化成页面内提醒，并明确告知这个限制
 - **忆小尘 · 账**（v0.4.0）：总览 / 统计页右下角的助手按钮。问「这个月花了多少」「哪一类最多」「预算还剩多少」「我现在有多少钱」「哪一类涨得最快」，也能直接说「记一笔午饭 25」——它把账目摆出来给你确认，点「就这样记」才真的落库
@@ -324,8 +324,8 @@ python scripts/make-pwa-assets.py       # 网页版用的那几张 PNG
 「忆」，马善政毛笔楷书备用），只用来生成图标，不进安装包。印章上的「记」用
 宋体加粗后做刀刻处理 —— 本机没有篆书字体，篆书虽是印章正体，但装不上就算了。
 
-产物结构：`yichen-ledger-0.4.0-win-x64.exe`（约 88 MB，可选安装目录）、
-`yichen-ledger-0.4.0-win-x64.zip`（免安装，约 112 MB）。
+产物结构：`yichen-ledger-0.7.0-win-x64.exe`（约 88 MB，可选安装目录）、
+`yichen-ledger-0.7.0-win-x64.zip`（免安装，约 112 MB）。
 
 > **排坑：别在项目目录里跑产出的安装包。** NSIS 生成卸载程序时会执行一次
 > 自己产出的安装包。如果安装包就躺在项目目录里（比如
@@ -372,7 +372,7 @@ executableName: 'yichen-ledger', // 程序目录名、可执行文件名 —— 
 
 | 平台 | 磁盘上的名字 | 用户看到的名字 |
 | --- | --- | --- |
-| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆尘记账」，窗口标题「忆尘记账」，控制面板「忆尘记账 0.4.0」 |
+| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆尘记账」，窗口标题「忆尘记账」，控制面板「忆尘记账 0.7.0」 |
 | macOS | `/Applications/yichen-ledger.app` | Finder、启动台、Dock 显示「忆尘记账」（来自 `CFBundleName` / `CFBundleDisplayName`） |
 | Linux | `yichen-ledger` 可执行文件 + `*.AppImage` | 应用菜单里显示「忆尘记账」（`.desktop` 的 `Name`） |
 | Android / iOS | `com.yichen.ledger` | 桌面图标下的名字「忆尘记账」 |
@@ -474,8 +474,8 @@ npx cap open ios         # 在 Xcode 里运行 / 打包
 把这一步交给 GitHub Actions —— 它三种系统的 runner 都有：
 
 ```bash
-git tag v0.6.0
-git push origin v0.6.0
+git tag v0.7.0
+git push origin v0.7.0
 ```
 
 推一个 `v*` 的 tag 就会并行跑五个任务，然后建一个 Release，把产物挂上去：
