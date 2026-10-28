@@ -9,6 +9,7 @@ import {
   Target,
   Wallet,
 } from 'lucide-react';
+import { AppRail, AppSwitchButton } from './components/AppRail';
 import { LedgerProvider, useLedger } from './state/LedgerContext';
 import { AppearanceProvider } from './state/AppearanceContext';
 import { ModeProvider, useMode, type AppMode } from './state/ModeContext';
@@ -17,7 +18,7 @@ import { ToastProvider } from './components/Toast';
 import { Backdrop, Ambient } from './components/Backdrop';
 import { AssistantProvider } from './state/AssistantContext';
 import { AssistantHost, useAssistantUi } from './components/AssistantHost';
-import { AssistantFab } from './components/AssistantPanel';
+import { AssistantFab, useFabPosition } from './components/AssistantFab';
 import { db } from './db';
 import Dashboard from './pages/Dashboard';
 import Add from './pages/Add';
@@ -26,7 +27,7 @@ import Budgets from './pages/Budgets';
 import SettingsPage from './pages/SettingsPage';
 import Accounts from './pages/Accounts';
 import Categories from './pages/Categories';
-import Schedule from './pages/Schedule';
+import { ScheduleShell } from './pages/schedule/ScheduleShell';
 
 /** 导航项：标签在渲染时用 t() 取，这样切语言不需要重建数组 */
 const NAV: Array<{ to: string; label: DictKey; icon: typeof LayoutDashboard; end: boolean }> = [
@@ -49,8 +50,10 @@ const ORDER = ['/', '/stats', '/budgets', '/settings', '/accounts', '/categories
 function Shell() {
   const { ready, error } = useLedger();
   const { t } = useI18n();
-  const { mode, setMode } = useMode();
+  const { mode, setMode, loading: modeLoading } = useMode();
   const { open: assistantOpen, show: showAssistant } = useAssistantUi();
+  // 忆小尘入口的位置（可拖动、吸附到左右边），存在 IndexedDB 里
+  const { pos: fabPos, save: saveFabPos } = useFabPosition();
   const location = useLocation();
   const navigate = useNavigate();
   const isAdd = location.pathname.startsWith('/add') || location.pathname.startsWith('/edit');
@@ -103,14 +106,20 @@ function Shell() {
    * ------------------------------------------------------------------
    * 切到日程模式而当前还停在记账的某一页时，直接跳 /schedule；
    * 切回记账而停在 /schedule 时跳回总览。否则会出现「在日程模式下看着统计页」这种怪状态。
+   *
+   * 注意 modeLoading：模式是从 IndexedDB 异步读出来的，第一帧一律是 'ledger'。
+   * 不加这道闸，直接打开 #/schedule?tab=timetable（刷新、从通知点回来）时，
+   * 会被这个 effect 立刻改写成 #/，然后模式读完再跳一次 /schedule ——
+   * 结果标签页丢了、课表回到日程。等模式读完再对齐就没有这一跳。
    */
   useEffect(() => {
+    if (modeLoading) return;
     if (isSchedule && !location.pathname.startsWith('/schedule') && !location.pathname.startsWith('/settings')) {
       navigate('/schedule', { replace: true });
     } else if (!isSchedule && location.pathname.startsWith('/schedule')) {
       navigate('/', { replace: true });
     }
-  }, [isSchedule, location.pathname, navigate]);
+  }, [isSchedule, modeLoading, location.pathname, navigate]);
 
   function switchMode(next: AppMode) {
     setMode(next);
@@ -130,6 +139,8 @@ function Shell() {
               <span>{t('app.tagline')}</span>
             </div>
           </div>
+
+          <AppRail mode={mode} onSwitch={switchMode} />
 
           {isSchedule ? (
             <>
@@ -171,8 +182,6 @@ function Shell() {
 
           <div style={{ flex: 1 }} />
 
-          <ModeSwitch mode={mode} onSwitch={switchMode} />
-
           <div className="muted sidebar-version">
             v{__APP_VERSION__} · {t('app.localFirst')}
           </div>
@@ -196,7 +205,7 @@ function Shell() {
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/accounts" element={<Accounts />} />
                 <Route path="/categories" element={<Categories />} />
-                <Route path="/schedule" element={<Schedule />} />
+                <Route path="/schedule" element={<ScheduleShell />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </div>
@@ -205,7 +214,13 @@ function Shell() {
       </main>
 
       {/* 面板开着时把入口藏掉：面板是玻璃，按钮会在底下透出来 */}
-      {showFab && !assistantOpen ? <AssistantFab onOpen={showAssistant} /> : null}
+      {showFab && !assistantOpen ? (
+        <AssistantFab
+          pos={fabPos}
+          onOpen={showAssistant}
+          onDrop={(side, y) => saveFabPos({ side, y })}
+        />
+      ) : null}
 
       {!isAdd ? (
         <nav className="tabbar has-backdrop">
@@ -245,51 +260,11 @@ function Shell() {
                 </NavLink>
               </>
             )}
-            <ModeSwitch mode={mode} onSwitch={switchMode} compact />
+            {/* 手机上只剩一枚「去另一个 App」的图标 —— 见 components/AppRail.tsx */}
+            <AppSwitchButton mode={mode} onSwitch={switchMode} />
           </div>
         </nav>
       ) : null}
-    </div>
-  );
-}
-
-/**
- * 功能切换钮
- * ------------------------------------------------------------------
- * 桌面上放在侧边栏底部，移动端放在底部导航条最右边（compact 版本只留图标）。
- * 用两段式胶囊而不是下拉：只有两个功能，点一下就切完，不用先展开再选。
- */
-function ModeSwitch({
-  mode,
-  onSwitch,
-  compact = false,
-}: {
-  mode: AppMode;
-  onSwitch: (m: AppMode) => void;
-  compact?: boolean;
-}) {
-  const { t } = useI18n();
-  return (
-    <div className={`mode-switch${compact ? ' compact' : ''}`} title={t('mode.switchHint')}>
-      {!compact ? <div className="mode-switch-label">{t('mode.switchHint')}</div> : null}
-      <div className="mode-switch-track">
-        <button
-          className={mode === 'ledger' ? 'on' : ''}
-          onClick={() => onSwitch('ledger')}
-          aria-label={t('mode.ledger')}
-        >
-          <Wallet size={compact ? 16 : 14} />
-          {compact ? null : t('mode.ledger')}
-        </button>
-        <button
-          className={mode === 'schedule' ? 'on' : ''}
-          onClick={() => onSwitch('schedule')}
-          aria-label={t('mode.schedule')}
-        >
-          <CalendarDays size={compact ? 16 : 14} />
-          {compact ? null : t('mode.schedule')}
-        </button>
-      </div>
     </div>
   );
 }

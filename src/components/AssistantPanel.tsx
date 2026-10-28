@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, CornerDownLeft, RotateCcw, Sparkles, X } from 'lucide-react';
+import { CornerDownLeft, RotateCcw, Sparkles, X } from 'lucide-react';
 import { useI18n, type DictKey } from '../i18n';
 import { useAssistantState } from '../state/AssistantContext';
 import type { ChatMessage } from '../state/assistant';
@@ -196,18 +196,5 @@ function Bubble({ msg, onApply }: { msg: ChatMessage; onApply: () => void }) {
         ) : null}
       </div>
     </div>
-  );
-}
-
-/**
- * 各页面右下角的「叫忆小尘」按钮。
- * 单独抽出来是因为三个页面都要放，且位置/动画要一致。
- */
-export function AssistantFab({ onOpen }: { onOpen: () => void }) {
-  const { t } = useI18n();
-  return (
-    <button className="assistant-fab" onClick={onOpen} aria-label={t('assistant.open')} title={t('assistant.open')}>
-      <Bot size={20} />
-    </button>
   );
 }
