@@ -52,7 +52,7 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
 
   const suggestions = useMemo<DictKey[]>(() => {
     if (mode === 'schedule') {
-      return ['assistant.ask.week', 'assistant.ask.free', 'assistant.ask.add'];
+      return ['assistant.ask.week', 'assistant.ask.free', 'assistant.ask.addEvent'];
     }
     return ['assistant.ask.spend', 'assistant.ask.top', 'assistant.ask.budget', 'assistant.ask.net', 'assistant.ask.add'];
   }, [mode]);
