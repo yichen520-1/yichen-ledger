@@ -29,11 +29,12 @@ PHONES = [
     ("m-02b-add-filled.png", "记一笔"),
     ("m-04-stats.png", "统计"),
     ("m-schedule-month.png", "日程"),
+    ("m-timetable.png", "课表"),
     ("assistant-chat.png", "忆小尘"),
 ]
 DESKTOP = ("d-assistant-chat.png", "桌面版")
 
-PANEL_W = 232          # 每张手机图缩放后的宽度
+PANEL_W = 200          # 每张手机图缩放后的宽度（六张并排，比五张时收窄一点）
 DESKTOP_W = 1220       # 桌面图缩放后的宽度
 GAP = 18
 PAD = 0                # 画布外边距，0 = 让圆角贴边，README 里更好排

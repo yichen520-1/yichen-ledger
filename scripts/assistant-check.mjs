@@ -187,14 +187,14 @@ try {
   check('总览净资产已更新', net.includes('500.00'), net);
 
   // ---------- 5. 日程模式 ----------
+  // v0.7.0 起两个 App 的入口换成了 AppRail / 底部导航里的一枚图标按钮
   await page.evaluate(() => {
-    const groups = [...document.querySelectorAll('.mode-switch')].filter((g) => {
-      const r = g.getBoundingClientRect();
-      return r.width > 0 && r.height > 0;
-    });
-    groups[0]?.querySelectorAll('.mode-switch-track button')[1]?.click();
+    const b =
+      document.querySelector('.tabbar .tab-app') ||
+      [...document.querySelectorAll('.app-rail .app-tile')].find((t) => t.getAttribute('aria-label')?.includes('日程'));
+    b?.click();
   });
-  await sleep(900);
+  await sleep(1200);
   const schedFab = await page.$('.assistant-fab');
   check('日程页有忆小尘入口', schedFab !== null);
   if (schedFab) await schedFab.click();
