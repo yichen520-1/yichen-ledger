@@ -7,11 +7,16 @@
     <!--
       CSP：Electron 会警告没有策略的页面。
       不用 unsafe-eval；style 放开 inline 是因为 React/AntD 式的行内样式和 vite 注入的样式需要它。
-      connect-src 里的 ws: 只给 dev 时的 HMR 用，打包后不会建立连接。
+      connect-src 必须放开 https：忆小尘和图片识别要直连用户自己填的模型服务
+      （api.deepseek.com / api.openai.com / 自建网关），写死 'self' 会让这些请求
+      在浏览器里被拦成「Failed to fetch」，而用户完全看不出是策略问题。
+      本机地址（Ollama 11434、LM Studio 1234 这类本地网关）也放开，
+      它们只在这台机器上，不算对外暴露。
+      ws: 只给 dev 时的 HMR 用，打包后不会建立连接。
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https: http://127.0.0.1:* http://localhost:* ws: wss:; object-src 'none'; base-uri 'none'"
     />
     <meta
       name="description"

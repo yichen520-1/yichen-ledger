@@ -95,9 +95,19 @@ export function hasKey(c: AiConfig): boolean {
 export async function chatCompletion(
   config: AiConfig,
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: unknown }>,
-  opts: { temperature?: number; maxTokens?: number; signal?: AbortSignal } = {},
+  opts: { temperature?: number; maxTokens?: number; signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<string> {
   const url = `${config.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+
+  /**
+   * 必须有个兜底的超时。
+   * 没有它，网络半死不活时 fetch 会一直挂着，对话框上的「正在输入」
+   * 三个点会转到天荒地老 —— 用户只能以为助手卡死了。
+   */
+  const timeoutMs = opts.timeoutMs ?? 30_000;
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
+
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -111,7 +121,7 @@ export async function chatCompletion(
       max_tokens: opts.maxTokens ?? 1024,
       stream: false,
     }),
-    signal: opts.signal,
+    signal,
   });
 
   if (!res.ok) {
