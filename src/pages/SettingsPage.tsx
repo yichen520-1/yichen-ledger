@@ -22,6 +22,7 @@ import {
 } from '../state/AppearanceContext';
 import { exportBackup, exportCsvText, importBackup, importCsvText } from '../db/repository';
 import { db } from '../db';
+import { PROVIDER_PRESETS, useAiConfig, type AiConfig, type AiProvider } from '../state/ai';
 
 /**
  * 设置中心
@@ -113,6 +114,22 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
   const [region, setRegion] = useState<RegionKey>('main');
   const [startup, setStartup] = useState<Startup>('dashboard');
+
+  // AI 设置：读一次填进表单，改完点保存才写库
+  const { config, save: saveAiConfig } = useAiConfig();
+  const [ai, setAi] = useState<AiConfig>(config);
+  const aiSeeded = useRef(false);
+  useEffect(() => {
+    if (aiSeeded.current) return;
+    if (config.apiKey || config.baseUrl) {
+      setAi(config);
+      aiSeeded.current = true;
+    }
+  }, [config]);
+  const saveAi = async (next: AiConfig) => {
+    setAi(next);
+    await saveAiConfig(next);
+  };
 
   // 启动页是独立的小设置，读一次即可
   useEffect(() => {
@@ -578,6 +595,83 @@ export default function SettingsPage() {
         </button>
         <input ref={backupInput} type="file" accept=".json,application/json" hidden onChange={onBackupFile} />
         <input ref={csvInput} type="file" accept=".csv,text/csv" hidden onChange={onCsvFile} />
+      </section>
+
+      {/* ---------- AI ---------- */}
+      <div className="section-title">{t('settings.aiTitle')}</div>
+      <section className="card">
+        <div className="muted" style={{ marginBottom: 12, lineHeight: 1.62 }}>
+          {t('settings.aiHint')}
+        </div>
+
+        <Row name={t('settings.aiProvider')}>
+          <select
+            className="input"
+            value={ai.provider}
+            onChange={(e) => {
+              const provider = e.target.value as AiProvider;
+              const preset = PROVIDER_PRESETS[provider];
+              setAi({
+                ...ai,
+                provider,
+                baseUrl: preset.baseUrl || ai.baseUrl,
+                model: preset.model || ai.model,
+              });
+            }}
+          >
+            <option value="deepseek">{t('settings.aiProviderDeepseek')}</option>
+            <option value="openai">{t('settings.aiProviderOpenai')}</option>
+            <option value="custom">{t('settings.aiProviderCustom')}</option>
+          </select>
+        </Row>
+
+        <Row name={t('settings.aiBaseUrl')}>
+          <input
+            className="input"
+            value={ai.baseUrl}
+            placeholder="https://api.deepseek.com"
+            onChange={(e) => setAi({ ...ai, baseUrl: e.target.value })}
+          />
+        </Row>
+
+        <Row name={t('settings.aiModel')} hint={t('settings.aiModelHint')}>
+          <input
+            className="input"
+            value={ai.model}
+            placeholder="deepseek-chat"
+            onChange={(e) => setAi({ ...ai, model: e.target.value })}
+          />
+        </Row>
+
+        <Row name={t('settings.aiApiKey')} hint={t('settings.aiApiKeyHint')}>
+          <input
+            className="input"
+            type="password"
+            value={ai.apiKey}
+            placeholder="sk-…"
+            autoComplete="off"
+            onChange={(e) => setAi({ ...ai, apiKey: e.target.value })}
+          />
+        </Row>
+
+        <div className="row gap" style={{ marginTop: 12 }}>
+          <button
+            className="btn primary grow"
+            onClick={() => {
+              void saveAi(ai).then(() => toast(t('settings.aiSaved')));
+            }}
+          >
+            {t('settings.aiSave')}
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              void saveAi({ ...ai, apiKey: '' }).then(() => toast(t('settings.aiCleared')));
+            }}
+          >
+            {t('settings.aiClear')}
+          </button>
+        </div>
       </section>
 
       <div className="section-title">{t('settings.danger')}</div>

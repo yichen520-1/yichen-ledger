@@ -1365,3 +1365,626 @@ textarea {
 .toast {
   animation: toast-in var(--dur-base) var(--ease-ios) both;
 }
+
+/* ==================================================================
+   忆尘日程
+   ================================================================== */
+
+/* 功能切换钮：侧边栏底部两段式胶囊，移动端收成只有图标 */
+.mode-switch {
+  margin: 0 0 10px;
+  padding: 9px 10px;
+  border-radius: 13px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line-soft);
+}
+
+.mode-switch-label {
+  font-size: calc(11px * var(--font-scale, 1));
+  color: var(--text-faint);
+  letter-spacing: 0.06em;
+  margin-bottom: 7px;
+  padding-left: 2px;
+}
+
+.mode-switch-track {
+  display: flex;
+  gap: 4px;
+  background: var(--bg);
+  border-radius: 9px;
+  padding: 3px;
+}
+
+.mode-switch-track button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 6px;
+  border-radius: 7px;
+  color: var(--text-faint);
+  font-size: calc(12px * var(--font-scale, 1));
+  transition:
+    background var(--dur-fast) var(--ease-out-soft),
+    color var(--dur-fast) var(--ease-out-soft);
+}
+
+.mode-switch-track button.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* 底部导航里的紧凑版：不占一整行，贴在最后 */
+.mode-switch.compact {
+  margin: 0 0 0 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  flex: 0 0 auto;
+}
+
+.mode-switch.compact .mode-switch-track {
+  background: var(--bg-elev);
+  padding: 3px;
+}
+
+.mode-switch.compact .mode-switch-track button {
+  padding: 7px;
+}
+
+/* 页头右侧的按钮组 */
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.btn.icon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+}
+
+/* 通用输入框（日程表单、搜索都用它） */
+.input {
+  width: 100%;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 11px;
+  color: var(--text);
+  font-size: calc(13.5px * var(--font-scale, 1));
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-out-soft);
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+.input.num {
+  width: 76px;
+  flex: 0 0 auto;
+}
+
+select.input {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-faint) 50%),
+    linear-gradient(135deg, var(--text-faint) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% + 1px),
+    calc(100% - 11px) calc(50% + 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 32px;
+}
+
+.search-box {
+  padding: 12px;
+}
+
+.search-box .input {
+  margin-bottom: 4px;
+}
+
+/* 月份条 + 视图切换 */
+.sched-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 11px 13px;
+}
+
+.month-nav .month-label {
+  font-size: calc(14px * var(--font-scale, 1));
+  font-weight: 600;
+  min-width: 96px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+
+.month-nav .month-label:active {
+  background: var(--bg-elev-2);
+}
+
+.segmented.compact {
+  padding: 2px;
+}
+
+.segmented.compact button {
+  padding: 5px 12px;
+  font-size: calc(12px * var(--font-scale, 1));
+}
+
+/* 月视图 */
+.sched-month {
+  padding: 12px 10px;
+}
+
+.sched-weekhead {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.sched-wd {
+  text-align: center;
+  font-size: calc(11px * var(--font-scale, 1));
+  color: var(--text-faint);
+  padding: 3px 0;
+}
+
+.sched-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.sched-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 9px;
+  color: var(--text);
+  font-size: calc(13px * var(--font-scale, 1));
+  font-variant-numeric: tabular-nums;
+  transition: background var(--dur-fast) var(--ease-out-soft);
+}
+
+.sched-cell .d {
+  line-height: 1;
+}
+
+.sched-cell.out {
+  color: var(--text-faint);
+  opacity: 0.45;
+}
+
+.sched-cell.today .d {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.sched-cell.today::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(255, 180, 84, 0.4);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.sched-cell.sel {
+  background: var(--bg-elev-2);
+}
+
+.sched-cell.sel .d {
+  color: var(--accent);
+}
+
+.dots {
+  display: flex;
+  gap: 2.5px;
+  height: 4px;
+  align-items: center;
+}
+
+.dots i {
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.85;
+}
+
+/* 周视图 */
+.sched-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  padding: 10px 8px;
+}
+
+.sched-weekcol {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sched-weekday {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 0;
+  border-radius: 8px;
+  color: var(--text-dim);
+}
+
+.sched-weekday .wd {
+  font-size: calc(10.5px * var(--font-scale, 1));
+  color: var(--text-faint);
+}
+
+.sched-weekday .dd {
+  font-size: calc(14px * var(--font-scale, 1));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sched-weekcol.today .sched-weekday {
+  background: var(--accent-soft);
+}
+
+.sched-weekcol.today .dd {
+  color: var(--accent);
+}
+
+.sched-weeklist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sched-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  padding: 4px 5px;
+  border-radius: 6px;
+  border-left: 2.5px solid var(--accent);
+  background: var(--bg-elev-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sched-chip .tm {
+  font-size: calc(9.5px * var(--font-scale, 1));
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.sched-chip .tt {
+  font-size: calc(11px * var(--font-scale, 1));
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sched-chip.done {
+  opacity: 0.5;
+}
+
+.sched-chip.done .tt {
+  text-decoration: line-through;
+}
+
+.sched-blank {
+  text-align: center;
+  font-size: calc(11px * var(--font-scale, 1));
+  color: var(--text-faint);
+  opacity: 0.4;
+  padding: 4px 0;
+}
+
+.sched-dayhead {
+  font-size: calc(13px * var(--font-scale, 1));
+  color: var(--text-dim);
+  padding: 2px 2px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 日程条目 */
+.sched-row {
+  gap: 9px;
+}
+
+.sched-check {
+  flex: 0 0 auto;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--bg);
+  transition:
+    background var(--dur-fast) var(--ease-out-soft),
+    border-color var(--dur-fast) var(--ease-out-soft);
+}
+
+.sched-row.done .sched-check {
+  background: var(--green);
+  border-color: var(--green);
+  color: #0f1216;
+}
+
+.sched-row.done .tx-title {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+
+.sched-open {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sched-date {
+  flex: 0 0 auto;
+  font-size: calc(11.5px * var(--font-scale, 1));
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 表单里的颜色 / 重复日 / 提醒 */
+.color-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.color-chip {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  transition: transform var(--dur-fast) var(--ease-out-soft);
+}
+
+.color-chip.on {
+  border-color: var(--text);
+  transform: scale(1.08);
+}
+
+.wd-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.wd-chip {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: calc(12.5px * var(--font-scale, 1));
+}
+
+.wd-chip.on {
+  background: var(--accent-soft);
+  border-color: rgba(255, 180, 84, 0.45);
+  color: var(--accent);
+}
+
+.chip-wrap {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: calc(12px * var(--font-scale, 1));
+}
+
+.chip.on {
+  background: var(--accent-soft);
+  border-color: rgba(255, 180, 84, 0.4);
+  color: var(--accent);
+}
+
+.sheet-actions {
+  margin-top: 14px;
+}
+
+.row.gap {
+  gap: 9px;
+}
+
+/* 通知横幅：跟警示条区分开，走蓝色系 */
+.banner-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-color: rgba(90, 169, 240, 0.3);
+  background: linear-gradient(150deg, rgba(90, 169, 240, 0.12), rgba(90, 169, 240, 0.04));
+}
+
+.banner-main {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.banner-main svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--blue);
+}
+
+.banner-info .banner-title {
+  color: #cfe6ff;
+}
+
+.banner-info .banner-body {
+  color: #b9cee2;
+}
+
+/* 图片识别 */
+.ocr-body {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.ocr-hint {
+  font-size: calc(12.5px * var(--font-scale, 1));
+  line-height: 1.65;
+}
+
+.ocr-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ocr-needkey {
+  font-size: calc(11.5px * var(--font-scale, 1));
+}
+
+.ocr-preview {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-elev-2);
+}
+
+.ocr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.ocr-item {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  transition: border-color var(--dur-fast) var(--ease-out-soft);
+}
+
+.ocr-item.on {
+  border-color: rgba(255, 180, 84, 0.42);
+  background: var(--accent-soft);
+}
+
+.ocr-dot {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  color: var(--accent);
+  margin-top: 1px;
+}
+
+.ocr-item.on .ocr-dot {
+  border-color: var(--accent);
+}
+
+.ocr-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ocr-title {
+  font-size: calc(13px * var(--font-scale, 1));
+  color: var(--text);
+}
+
+.ocr-meta {
+  font-size: calc(11.5px * var(--font-scale, 1));
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ------------------------------------------------------------------
+   日程页在桌面宽度下的修正
+   ------------------------------------------------------------------
+   .sched-cell 用 aspect-ratio 做成正方形，在 430px 宽的手机上正好 52px，
+   但桌面上主内容区有 900px，正方形会把每个格子撑到 120px 高、整月撑出两屏。
+   所以宽屏下改成固定行高。这条必须写在 .sched-cell 之后，靠顺序覆盖。
+   ------------------------------------------------------------------ */
+@media (min-width: 900px) {
+  .sched-cell {
+    aspect-ratio: auto;
+    height: 66px;
+  }
+
+  .sched-week {
+    gap: 8px;
+    padding: 14px 12px;
+  }
+
+  .sched-chip .tt {
+    font-size: calc(11.5px * var(--font-scale, 1));
+  }
+}
