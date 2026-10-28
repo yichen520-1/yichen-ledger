@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { Account, Budget, Category, Settings, Transaction } from '../domain/model';
+import type { EventItem } from '../domain/schedule';
 
 /**
  * 本地数据库（IndexedDB）。
@@ -12,6 +13,7 @@ export class LedgerDB extends Dexie {
   transactions!: Table<Transaction, string>;
   budgets!: Table<Budget, string>;
   settings!: Table<Settings, string>;
+  events!: Table<EventItem, string>;
 
   constructor(name = 'yichen-ledger') {
     super(name);
@@ -21,6 +23,17 @@ export class LedgerDB extends Dexie {
       transactions: 'id, date, type, categoryId, accountId, toAccountId',
       budgets: 'id, categoryId, month',
       settings: 'key',
+    });
+    // v2 只新增一张 events 表，不动原有四张表的索引。
+    // Dexie 的版本升级是「增量的」：老用户的账目、账户、分类、预算原样保留，
+    // 只是多出一张空表；新用户则一次性建好全部表。
+    this.version(2).stores({
+      accounts: 'id, kind, archived, sort',
+      categories: 'id, type, sort',
+      transactions: 'id, date, type, categoryId, accountId, toAccountId',
+      budgets: 'id, categoryId, month',
+      settings: 'key',
+      events: 'id, date, done',
     });
   }
 }

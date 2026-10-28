@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, seedIfEmpty } from '../db';
 import type { Account, Budget, Category, Transaction } from '../domain/model';
+import type { EventItem } from '../domain/schedule';
 import { useI18n } from '../i18n';
 
 interface LedgerState {
@@ -13,6 +14,7 @@ interface LedgerState {
   categories: Category[];
   transactions: Transaction[];
   budgets: Budget[];
+  events: EventItem[];
   accountName: (id: string | null | undefined) => string;
   categoryOf: (id: string | null | undefined) => Category | undefined;
 }
@@ -45,8 +47,14 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const categories = useLiveQuery(() => db.categories.toArray());
   const transactions = useLiveQuery(() => db.transactions.toArray());
   const budgets = useLiveQuery(() => db.budgets.toArray());
+  const events = useLiveQuery(() => db.events.toArray());
 
-  const loading = accounts === undefined || categories === undefined || transactions === undefined || budgets === undefined;
+  const loading =
+    accounts === undefined ||
+    categories === undefined ||
+    transactions === undefined ||
+    budgets === undefined ||
+    events === undefined;
   const ready = seeded && !loading;
 
   const value = useMemo<LedgerState>(() => {
@@ -62,10 +70,11 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       categories: catList.slice().sort((a, b) => a.sort - b.sort),
       transactions: transactions ?? [],
       budgets: budgets ?? [],
+      events: events ?? [],
       accountName: (id) => (id ? accMap.get(id) ?? t('common.deletedAccount') : ''),
       categoryOf: (id) => (id ? catMap.get(id) : undefined),
     };
-  }, [ready, loading, error, accounts, categories, transactions, budgets, t]);
+  }, [ready, loading, error, accounts, categories, transactions, budgets, events, t]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -12,6 +12,7 @@ import {
   type Transaction,
   type TxType,
 } from '../domain/model';
+import { newEvent, type EventItem } from '../domain/schedule';
 
 /** 新建账目时用户真正需要填的东西 */
 export interface TransactionDraft {
@@ -45,7 +46,10 @@ export type ErrorCode =
   | 'errors.builtinCategory'
   | 'errors.backupInvalid'
   | 'errors.csvEmpty'
-  | 'errors.csvHeader';
+  | 'errors.csvHeader'
+  | 'errors.eventTitleRequired'
+  | 'errors.timeInvalid'
+  | 'errors.timeOrder';
 
 export class ValidationError extends Error {
   readonly code: ErrorCode;
@@ -162,23 +166,110 @@ export async function listBudgets(): Promise<Budget[]> {
   return db.budgets.toArray();
 }
 
+/* ---------------------------------------------------------------- 忆尘日程 */
+
+/** 日程草稿：新建/编辑时表单填的东西 */
+export interface EventDraft {
+  title: string;
+  notes: string;
+  location: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  allDay: boolean;
+  color: string;
+  tag: string;
+  recurrence: EventItem['recurrence'];
+  reminders: number[];
+}
+
+/** 校验日程草稿 */
+export function validateEventDraft(draft: EventDraft): void {
+  if (!draft.title.trim()) throw new ValidationError('errors.eventTitleRequired');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) throw new ValidationError('errors.dateInvalid');
+  if (!draft.allDay) {
+    if (!/^\d{2}:\d{2}$/.test(draft.startTime)) throw new ValidationError('errors.timeInvalid');
+    if (!/^\d{2}:\d{2}$/.test(draft.endTime)) throw new ValidationError('errors.timeInvalid');
+    if (draft.endTime < draft.startTime) throw new ValidationError('errors.timeOrder');
+  }
+}
+
+export async function listEvents(): Promise<EventItem[]> {
+  return db.events.toArray();
+}
+
+export async function createEvent(draft: EventDraft): Promise<EventItem> {
+  validateEventDraft(draft);
+  const now = new Date().toISOString();
+  const ev: EventItem = {
+    ...newEvent(),
+    ...draft,
+    title: draft.title.trim(),
+    id: newId('ev'),
+    done: false,
+    doneDates: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.events.put(ev);
+  return ev;
+}
+
+export async function updateEvent(id: string, draft: EventDraft): Promise<EventItem> {
+  validateEventDraft(draft);
+  const old = await db.events.get(id);
+  if (!old) throw new ValidationError('errors.notFound');
+  const ev: EventItem = {
+    ...old,
+    ...draft,
+    title: draft.title.trim(),
+    updatedAt: new Date().toISOString(),
+  };
+  await db.events.put(ev);
+  return ev;
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  await db.events.delete(id);
+}
+
+/** 勾掉一次发生：单次日程改 done，重复日程把日期记进 doneDates */
+export async function toggleEventDone(ev: EventItem, date: string): Promise<void> {
+  const fresh = await db.events.get(ev.id);
+  if (!fresh) return;
+  if ((fresh.recurrence?.freq ?? 'none') === 'none') {
+    fresh.done = !fresh.done;
+  } else {
+    const set = new Set(fresh.doneDates);
+    if (set.has(date)) set.delete(date);
+    else set.add(date);
+    fresh.doneDates = [...set].sort();
+  }
+  fresh.updatedAt = new Date().toISOString();
+  await db.events.put(fresh);
+}
+
 /** 导出全部数据为 JSON（备份用） */
 export async function exportBackup(): Promise<string> {
-  const [accounts, categories, transactions, budgets] = await Promise.all([
+  const [accounts, categories, transactions, budgets, events] = await Promise.all([
     db.accounts.toArray(),
     db.categories.toArray(),
     db.transactions.toArray(),
     db.budgets.toArray(),
+    db.events.toArray(),
   ]);
   return JSON.stringify(
     {
       app: 'yichen-ledger',
-      version: 1,
+      // 备份格式版本：2 起多了 events 字段。
+      // 老备份（version 1，没有 events）仍然能导入，只是日程为空。
+      version: 2,
       exportedAt: new Date().toISOString(),
       accounts,
       categories,
       transactions,
       budgets,
+      events,
     },
     null,
     2,
@@ -192,22 +283,33 @@ export async function importBackup(json: string): Promise<void> {
     categories?: Category[];
     transactions?: Transaction[];
     budgets?: Budget[];
+    events?: EventItem[];
   };
   if (!Array.isArray(data.accounts) || !Array.isArray(data.transactions)) {
     throw new ValidationError('errors.backupInvalid');
   }
-  await db.transaction('rw', db.accounts, db.categories, db.transactions, db.budgets, async () => {
-    await Promise.all([
-      db.accounts.clear(),
-      db.categories.clear(),
-      db.transactions.clear(),
-      db.budgets.clear(),
-    ]);
-    await db.accounts.bulkPut(data.accounts ?? []);
-    await db.categories.bulkPut(data.categories ?? []);
-    await db.transactions.bulkPut(data.transactions ?? []);
-    await db.budgets.bulkPut(data.budgets ?? []);
-  });
+  await db.transaction(
+    'rw',
+    db.accounts,
+    db.categories,
+    db.transactions,
+    db.budgets,
+    db.events,
+    async () => {
+      await Promise.all([
+        db.accounts.clear(),
+        db.categories.clear(),
+        db.transactions.clear(),
+        db.budgets.clear(),
+        db.events.clear(),
+      ]);
+      await db.accounts.bulkPut(data.accounts ?? []);
+      await db.categories.bulkPut(data.categories ?? []);
+      await db.transactions.bulkPut(data.transactions ?? []);
+      await db.budgets.bulkPut(data.budgets ?? []);
+      await db.events.bulkPut(data.events ?? []);
+    },
+  );
 }
 
 /** 导出 CSV 文本（可用 Excel 打开） */
