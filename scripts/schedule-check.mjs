@@ -71,24 +71,33 @@ check('按钮的无障碍名是目标 App 全名', tabApp?.label === '忆尘日�
 check('按钮里是真的 App 图标', /schedule-badge\.png$/.test(tabApp?.src ?? ''), tabApp?.src);
 check('图标按钮尺寸合理', (tabApp?.w ?? 0) >= 26 && (tabApp?.h ?? 0) >= 26, `${tabApp?.w}x${tabApp?.h}`);
 
-// 桌面宽度下侧边栏里的 AppRail 应该是两枚并排图标
+// 桌面宽度下侧边栏里的 AppRail 应该是上下两块：图标 + 名称 + 标语
 await page.setViewport({ width: 1280, height: 900 });
 await sleep(400);
 const rail = await page.evaluate(() => {
   const tiles = [...document.querySelectorAll('.app-rail .app-tile')];
+  const rects = tiles.map((t) => t.getBoundingClientRect());
   return {
     count: tiles.length,
-    labels: tiles.map((t) => t.querySelector('.app-tile-label')?.textContent?.trim() ?? ''),
+    names: tiles.map((t) => t.querySelector('.app-tile-name')?.textContent?.trim() ?? ''),
+    taglines: tiles.map((t) => t.querySelector('.app-tile-label')?.textContent?.trim() ?? ''),
     icons: tiles.map((t) => t.querySelector('.app-tile-icon img')?.getAttribute('src') ?? ''),
     onIndex: tiles.findIndex((t) => t.classList.contains('on')),
-    heights: tiles.map((t) => Math.round(t.getBoundingClientRect().height)),
+    heights: rects.map((x) => Math.round(x.height)),
+    widths: rects.map((x) => Math.round(x.width)),
+    tops: rects.map((x) => Math.round(x.top)),
+    // 侧边栏顶部不再有单独的 brand 块
+    hasBrand: !!document.querySelector('.sidebar .brand'),
   };
 });
-check('侧边栏 AppRail 有两枚图标', rail.count === 2, String(rail.count));
-check('两枚图标的标签是「忆尘记账 / 忆尘日程」', rail.labels.join('/') === '忆尘记账/忆尘日程', rail.labels.join('/'));
-check('两枚图标用的是各自 App 的真实图标', rail.icons.join(',').includes('pwa-192.png') && rail.icons.join(',').includes('schedule-badge.png'), rail.icons.join(','));
-check('当前 App 高亮在第一枚', rail.onIndex === 0, String(rail.onIndex));
-check('图标方块尺寸一致且不为 0', rail.heights[0] > 40 && rail.heights[0] === rail.heights[1], rail.heights.join('/'));
+check('侧边栏 AppRail 有两块', rail.count === 2, String(rail.count));
+check('两块的名字是「忆尘记账 / 忆尘日程」', rail.names.join('/') === '忆尘记账/忆尘日程', rail.names.join('/'));
+check('两块各自带标语', rail.taglines[0] === '所记皆来路，所忆皆无尘' && rail.taglines[1] === '所行皆有期，所至皆有时', rail.taglines.join(' | '));
+check('两块用的是各自 App 的真实图标', rail.icons.join(',').includes('pwa-192.png') && rail.icons.join(',').includes('schedule-badge.png'), rail.icons.join(','));
+check('当前 App 高亮在第一块', rail.onIndex === 0, String(rail.onIndex));
+check('两块是上下排的（top 递增、left 相同）', rail.tops[1] > rail.tops[0], rail.tops.join('/'));
+check('两块等宽且撑满侧边栏', rail.widths[0] === rail.widths[1] && rail.widths[0] > 150, rail.widths.join('/'));
+check('侧边栏顶部没有单独的 brand 块', !rail.hasBrand);
 
 /* ---------------------------------------------------------- 2. 切到日程 */
 
@@ -103,13 +112,15 @@ const afterSwitch = await page.evaluate(() => ({
   hasMonth: !!document.querySelector('.sched-month'),
   cells: document.querySelectorAll('.sched-cell').length,
   weekdays: [...document.querySelectorAll('.sched-wd')].map((d) => d.textContent.trim()),
-  tabs: [...document.querySelectorAll('.sched-tab')].map((b) => b.textContent.trim()),
-  activeTab: document.querySelector('.sched-tab.on')?.textContent?.trim() ?? '',
+  // 页面右上角那块胶囊标签应该没有了
+  legacyTabs: document.querySelectorAll('.sched-tab').length,
+  // 底部导航（手机宽度）：日程 / 课表 / 设置 + 切 App 图标
+  bottom: [...document.querySelectorAll('.tabbar .tab:not(.tab-app)')].map((b) => b.textContent.trim()),
 }));
 check('切到日程后路由正确', afterSwitch.hash.startsWith('#/schedule'), afterSwitch.hash);
 check('日程页标题', afterSwitch.title === '忆尘日程', afterSwitch.title);
-check('日程页有两个标签：日程 / 课表', afterSwitch.tabs.join('/') === '日程/课表', afterSwitch.tabs.join('/'));
-check('默认停在「日程」标签', afterSwitch.activeTab === '日程', afterSwitch.activeTab);
+check('页面里不再有胶囊标签', afterSwitch.legacyTabs === 0, String(afterSwitch.legacyTabs));
+check('手机底部导航是 日程/课表/设置', afterSwitch.bottom.join('/') === '日程/课表/设置', afterSwitch.bottom.join('/'));
 check('月视图渲染', afterSwitch.hasMonth);
 check('月视图 42 格', afterSwitch.cells === 42, String(afterSwitch.cells));
 check('周标题是 一二三四五六日', afterSwitch.weekdays.join('') === '一二三四五六日', afterSwitch.weekdays.join(''));
@@ -201,10 +212,10 @@ const search = await page.evaluate(() => ({
 }));
 check('搜索命中', search.rows >= 1, `rows=${search.rows} empty=${search.empty}`);
 
-/* ---------------------------------------------------------- 7. 课表标签 */
+/* ---------------------------------------------------------- 7. 课表（侧边栏/底部导航） */
 
 await page.evaluate(() => {
-  const b = [...document.querySelectorAll('.sched-tab')].find((x) => x.textContent.includes('课表'));
+  const b = [...document.querySelectorAll('.tabbar .tab')].find((x) => x.textContent.trim() === '课表');
   b?.click();
 });
 await sleep(900);
@@ -228,12 +239,11 @@ const tt = await page.evaluate(() => {
     scrollW: scroll?.scrollWidth ?? 0,
     clientW: scroll?.clientWidth ?? 0,
     cardOverflow: card ? getComputedStyle(card).overflow : '',
-    weekLabel: document.querySelector('.month-label')?.textContent?.trim() ?? '',
     subtitle: document.querySelector('.page-sub')?.textContent?.trim() ?? '',
     empty: !!document.querySelector('.timetable-page .empty'),
   };
 });
-check('课表标签写进地址栏', tt.hash.includes('tab=timetable'), tt.hash);
+check('课表写进地址栏', tt.hash.includes('/schedule/timetable'), tt.hash);
 check('课表网格渲染', tt.hasGrid);
 check('课表格子 = 节次数 × 7', tt.cells === tt.periods * 7, `${tt.cells} = ${tt.periods}×7`);
 check('课表有 7 个星期表头', tt.heads === 7, String(tt.heads));
@@ -242,7 +252,7 @@ check('节次列显示「第几节 + 时间」', tt.periodTexts[0]?.includes('08
 check('网格行数 = 表头 + 节次数', tt.rows === tt.periods + 1, `${tt.rows} vs ${tt.periods + 1}`);
 check('卡片裁掉溢出（圆角不被网格戳破）', tt.cardOverflow === 'hidden', tt.cardOverflow);
 check('窄屏下网格可横向滚动', tt.scrollW >= tt.clientW, `${tt.scrollW}/${tt.clientW}`);
-check('顶部显示第几周', /第\s*\d+\s*周/.test(tt.weekLabel) || tt.subtitle.includes('周'), `${tt.weekLabel} / ${tt.subtitle}`);
+check('顶部显示第几周', /第\s*\d+\s*周/.test(tt.subtitle), tt.subtitle);
 check('没有课程时显示空状态', tt.empty);
 
 /* ---------------------------------------------------------- 8. 加一门课 */
@@ -297,11 +307,12 @@ await sleep(1400);
 const persisted = await page.evaluate(() => ({
   hash: location.hash,
   title: document.querySelector('.page-title')?.textContent ?? '',
-  activeTab: document.querySelector('.sched-tab.on')?.textContent?.trim() ?? '',
+  activeNav: [...document.querySelectorAll('.tabbar .tab.active')].map((b) => b.textContent.trim()).join('/'),
   blocks: document.querySelectorAll('.tt-block').length,
 }));
-check('刷新后仍在日程 App', persisted.title === '忆尘日程', `${persisted.hash} ${persisted.title}`);
-check('刷新后仍在课表标签', persisted.activeTab === '课表', persisted.activeTab);
+check('刷新后仍在课表路由', persisted.hash.includes('/schedule/timetable'), persisted.hash);
+check('刷新后标题是课表', persisted.title === '课表', persisted.title);
+check('刷新后底部导航高亮在课表', persisted.activeNav === '课表', persisted.activeNav);
 check('刷新后课程还在', persisted.blocks >= 1, String(persisted.blocks));
 
 /* ---------------------------------------------------------- 10. 切回记账 */

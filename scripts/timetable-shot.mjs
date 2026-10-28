@@ -71,7 +71,7 @@ try {
   // 必须走一次完整加载：模式是 App 启动时从库里读的，只改 hash 不会重读，
   // 会停在记账模式然后被路由 effect 弹回总览。
   await page.goto('about:blank');
-  await page.goto(`${BASE}#/schedule?tab=timetable`, { waitUntil: 'networkidle2' });
+  await page.goto(`${BASE}#/schedule/timetable`, { waitUntil: 'networkidle2' });
   await sleep(1600);
 
   await page.screenshot({ path: `${OUT}/m-timetable.png` });
@@ -107,7 +107,7 @@ try {
 
   // 桌面宽度
   await page.setViewport({ width: 1280, height: 860, deviceScaleFactor: 2 });
-  await page.goto(`${BASE}#/schedule?tab=timetable`, { waitUntil: 'networkidle2' });
+  await page.goto(`${BASE}#/schedule/timetable`, { waitUntil: 'networkidle2' });
   await sleep(1300);
   await page.screenshot({ path: `${OUT}/d-timetable.png` });
   console.log('shot  d-timetable.png');
