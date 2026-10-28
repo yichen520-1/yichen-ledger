@@ -20,6 +20,7 @@ export const en: Dict = {
     categories: 'Categories',
     add: 'Add entry',
     schedule: 'Schedule',
+    timetable: 'Timetable',
   },
 
   common: {

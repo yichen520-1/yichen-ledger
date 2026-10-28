@@ -1626,28 +1626,33 @@ textarea {
 /*
  * 双 App 入口（侧边栏）
  * ------------------------------------------------------------------
- * 不是「筛选器」，是两个并列的 App：上面一枚真图标（圆角方块，像桌面上的
- * 应用），下面一行小字。当前所在的那个亮起来，另一个是灰的但可点。
+ * 上下两块，每块一整行：左边一枚真图标（圆角方块，像桌面上的应用），
+ * 右边两行字 —— 名字和标语。当前所在的那块亮着，另一块压暗但可点。
+ *
+ * 为什么是竖排整块而不是并排两枚小图标：
+ *   并排两枚只有图标加一行 11px 小字，看起来像两个「按钮」；
+ *   一整个块带名字和标语，才像两个「应用」摆在架子上。
+ *   而且侧边栏本来就有 232px 宽，横向塞两枚反而浪费。
  *
  * 图标用的是各自 App 的打包图标（pwa-192.png / schedule-badge.png），
- * 不是线性图标 —— 线性图标看起来像「功能」，方块图标看起来像「应用」，
- * 这正是这次改造要的那个感觉。
+ * 不是线性图标 —— 线性图标看起来像「功能」，方块图标看起来像「应用」。
  */
 .app-rail {
   display: flex;
-  gap: 8px;
-  margin: 4px 0 14px;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 16px;
 }
 
 .app-tile {
-  flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 9px 4px 8px;
-  border-radius: 14px;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
   border: 1px solid transparent;
+  text-align: left;
+  width: 100%;
   transition:
     background var(--dur-fast) var(--ease-out-soft),
     border-color var(--dur-fast) var(--ease-out-soft),
@@ -1675,6 +1680,7 @@ textarea {
 .app-tile-icon {
   width: 40px;
   height: 40px;
+  flex: 0 0 40px;
   border-radius: 11px;
   overflow: hidden;
   display: block;
@@ -1693,18 +1699,37 @@ textarea {
   object-fit: cover;
 }
 
-.app-tile-label {
-  font-size: calc(11px * var(--font-scale, 1));
-  color: var(--text-faint);
-  line-height: 1.2;
+.app-tile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-tile-name {
+  font-size: calc(13.5px * var(--font-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
 }
 
-.app-tile.on .app-tile-label {
+.app-tile.on .app-tile-name {
   color: var(--accent);
+}
+
+/* 标语：和原来品牌区那行小字同一套排法，像题在画边的款识 */
+.app-tile-label {
+  font-size: calc(10.5px * var(--font-scale, 1));
+  color: var(--text-faint);
+  letter-spacing: 0.05em;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 底部导航里的那一枚：只有图标，不占一整个格子的宽度 */

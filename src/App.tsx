@@ -3,6 +3,7 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'reac
 import {
   BarChart3,
   CalendarDays,
+  Grid3x3,
   LayoutDashboard,
   Plus,
   Settings2,
@@ -45,7 +46,7 @@ const NAV: Array<{ to: string; label: DictKey; icon: typeof LayoutDashboard; end
  * 记账页（/add、/edit/:id）不参与左右推入，它是从底部盖上来的一层。
  * 其它页面按「导航顺序」判断是从左边来还是右边来，做出 iOS 那种方向感。
  */
-const ORDER = ['/', '/stats', '/budgets', '/settings', '/accounts', '/categories', '/schedule'];
+const ORDER = ['/', '/stats', '/budgets', '/settings', '/accounts', '/categories', '/schedule', '/schedule/timetable'];
 
 function Shell() {
   const { ready, error } = useLedger();
@@ -132,21 +133,21 @@ function Shell() {
       <aside className="sidebar has-backdrop">
         <Backdrop region="sidebar" />
         <div className="sidebar-inner">
-          <div className="brand">
-            <div className="brand-mark">忆</div>
-            <div className="brand-text">
-              <strong>{t('app.name')}</strong>
-              <span>{t('app.tagline')}</span>
-            </div>
-          </div>
-
           <AppRail mode={mode} onSwitch={switchMode} />
 
           {isSchedule ? (
             <>
-              <NavLink to="/schedule" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+              {/* 课表是 /schedule 的子路径，所以「日程」这一项必须 end，否则两项会一起亮 */}
+              <NavLink to="/schedule" end className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 <CalendarDays size={17} />
                 {t('nav.schedule')}
+              </NavLink>
+              <NavLink
+                to="/schedule/timetable"
+                className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+              >
+                <Grid3x3 size={17} />
+                {t('nav.timetable')}
               </NavLink>
               <NavLink to="/settings" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 <Settings2 size={17} />
@@ -206,6 +207,7 @@ function Shell() {
                 <Route path="/accounts" element={<Accounts />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/schedule" element={<ScheduleShell />} />
+                <Route path="/schedule/timetable" element={<ScheduleShell />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </div>
@@ -228,9 +230,16 @@ function Shell() {
           <div className="tabbar-inner">
             {isSchedule ? (
               <>
-                <NavLink to="/schedule" className={({ isActive }) => `tab${isActive ? ' active' : ''}`}>
+                <NavLink to="/schedule" end className={({ isActive }) => `tab${isActive ? ' active' : ''}`}>
                   <CalendarDays size={20} />
                   {t('nav.schedule')}
+                </NavLink>
+                <NavLink
+                  to="/schedule/timetable"
+                  className={({ isActive }) => `tab${isActive ? ' active' : ''}`}
+                >
+                  <Grid3x3 size={20} />
+                  {t('nav.timetable')}
                 </NavLink>
                 <NavLink to="/settings" className={({ isActive }) => `tab${isActive ? ' active' : ''}`}>
                   <Settings2 size={20} />

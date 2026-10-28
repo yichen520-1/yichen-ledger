@@ -25,6 +25,7 @@ export const zh = {
     categories: '分类',
     add: '记一笔',
     schedule: '日程',
+    timetable: '课表',
   },
 
   common: {

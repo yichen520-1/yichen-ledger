@@ -20,6 +20,7 @@ export const ja: Dict = {
     categories: 'カテゴリ',
     add: '記録する',
     schedule: '予定',
+    timetable: '時間割',
   },
 
   common: {
