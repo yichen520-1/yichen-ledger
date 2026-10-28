@@ -1,4 +1,4 @@
-/* 忆尘记账的 Service Worker。
+/* 忆笺记账的 Service Worker。
  *
  * 目的只有一个：装到手机主屏幕后，**没有网络也能打开**。
  * 这个 App 的数据本来就在本机 IndexedDB 里，唯一需要联网的只是那几个
@@ -14,7 +14,7 @@
  *     这样既能第一时间拿到新版本，离线也不白屏。
  */
 
-const CACHE = 'yichen-ledger-v9';
+const CACHE = 'yichen-ledger-v10';
 
 /** 从 index.html 里抠出所有需要预缓存的同源资源地址 */
 function assetsFromHtml(html, base) {

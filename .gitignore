@@ -22,6 +22,7 @@ build/_icon64.png
 # 本地缓存 / 临时目录
 .npm-cache/
 .tmp-ssh/
+.tmp-brand/
 .shots/
 .android-tools/
 .dsh/

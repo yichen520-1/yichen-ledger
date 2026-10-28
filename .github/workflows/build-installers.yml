@@ -46,7 +46,7 @@ jobs:
       - name: 核对可执行文件名是英文、显示名是中文
         # 磁盘上必须是 yichen-ledger.exe（纯 ASCII，NSIS 才不会在
         # 非 ASCII 路径上翻车）；窗口标题/快捷方式名来自 productName
-        # 与 nsis.shortcutName，仍然是「忆尘记账」。
+        # 与 nsis.shortcutName，仍然是「忆笺记账」。
         shell: pwsh
         run: |
           $exe = 'release\win-unpacked\yichen-ledger.exe'
@@ -56,7 +56,7 @@ jobs:
           "FileDescription: $($v.FileDescription)"
           "ProductName:     $($v.ProductName)"
           "FileVersion:     $($v.FileVersion)"
-          if ($v.FileDescription -ne '忆尘记账') { throw "FileDescription 不是中文显示名" }
+          if ($v.FileDescription -ne '忆笺记账') { throw "FileDescription 不是中文显示名" }
 
       - uses: actions/upload-artifact@v4
         with:
@@ -88,7 +88,7 @@ jobs:
       - name: 核对 .app 目录名是英文、显示名是中文
         # 这一条是给「程序名 ASCII / 显示名中文」这个约定留证据的：
         # 目录名必须落在 yichen-ledger.app，而 Info.plist 里的
-        # CFBundleName / CFBundleDisplayName 必须是「忆尘记账」。
+        # CFBundleName / CFBundleDisplayName 必须是「忆笺记账」。
         # Finder、启动台、Dock、活动监视器显示的都是后两者。
         run: |
           for app in release/mac*/*.app; do
@@ -194,7 +194,7 @@ jobs:
           want=$(node -p "require('./package.json').version")
           echo "package.json 版本: $want"
           grep -q "versionName='$want'" /tmp/badging.txt && echo "versionName OK" || { echo "versionName 对不上"; exit 1; }
-          grep -q "application-label:'忆尘记账'" /tmp/badging.txt && echo "应用显示名 OK（中文）" || { echo "应用显示名不是中文"; exit 1; }
+          grep -q "application-label:'忆笺记账'" /tmp/badging.txt && echo "应用显示名 OK（中文）" || { echo "应用显示名不是中文"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:
@@ -251,14 +251,14 @@ jobs:
 
       - name: 核对 .app 目录名是英文、桌面名是中文
         # 和 macOS 一样：磁盘上 App.app（纯 ASCII，Xcode 的 TARGET_NAME），
-        # 主屏上显示的是 Info.plist 里的 CFBundleDisplayName「忆尘记账」。
+        # 主屏上显示的是 Info.plist 里的 CFBundleDisplayName「忆笺记账」。
         run: |
           app="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
           test -d "$app" || { echo "找不到 $app"; exit 1; }
           echo "目录名: $(basename "$app")"
           echo -n "CFBundleDisplayName: "
           /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$app/Info.plist"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$app/Info.plist")" = "忆尘记账" \
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$app/Info.plist")" = "忆笺记账" \
             || { echo "显示名不是中文"; exit 1; }
 
       - uses: actions/upload-artifact@v4
@@ -306,7 +306,7 @@ jobs:
           else
             echo "没找到 $f，改用通用说明"
             cat > release-notes.md <<'EOF'
-          忆尘记账（本次未附详细说明，见仓库 README）
+          忆笺记账（本次未附详细说明，见仓库 README）
 
           | 平台 | 文件 | 说明 |
           | --- | --- | --- |
