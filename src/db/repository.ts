@@ -13,6 +13,14 @@ import {
   type TxType,
 } from '../domain/model';
 import { newEvent, type EventItem } from '../domain/schedule';
+import {
+  clampWeek,
+  defaultTimetableMeta,
+  newCourse,
+  type Course,
+  type CourseSession,
+  type TimetableMeta,
+} from '../domain/timetable';
 
 /** 新建账目时用户真正需要填的东西 */
 export interface TransactionDraft {
@@ -49,7 +57,10 @@ export type ErrorCode =
   | 'errors.csvHeader'
   | 'errors.eventTitleRequired'
   | 'errors.timeInvalid'
-  | 'errors.timeOrder';
+  | 'errors.timeOrder'
+  | 'errors.courseNameRequired'
+  | 'errors.courseSessionRequired'
+  | 'errors.courseTimeInvalid';
 
 export class ValidationError extends Error {
   readonly code: ErrorCode;
@@ -251,25 +262,31 @@ export async function toggleEventDone(ev: EventItem, date: string): Promise<void
 
 /** 导出全部数据为 JSON（备份用） */
 export async function exportBackup(): Promise<string> {
-  const [accounts, categories, transactions, budgets, events] = await Promise.all([
+  const [accounts, categories, transactions, budgets, events, courses, settings] = await Promise.all([
     db.accounts.toArray(),
     db.categories.toArray(),
     db.transactions.toArray(),
     db.budgets.toArray(),
     db.events.toArray(),
+    db.courses.toArray(),
+    db.settings.toArray(),
   ]);
   return JSON.stringify(
     {
       app: 'yichen-ledger',
-      // 备份格式版本：2 起多了 events 字段。
-      // 老备份（version 1，没有 events）仍然能导入，只是日程为空。
-      version: 2,
+      // 备份格式版本：2 起多了 events 字段，3 起多了 courses。
+      // 老备份（version 1/2）仍然能导入，缺的字段就当空。
+      version: 3,
       exportedAt: new Date().toISOString(),
       accounts,
       categories,
       transactions,
       budgets,
       events,
+      courses,
+      // 设置也一起带走：主题、语言、AI 配置、课表开学日期都在这里。
+      // 备份的本意是「换设备能接着用」，少了设置就得重配一遍。
+      settings: settings.filter((s) => s.key !== 'ai.config'),
     },
     null,
     2,
@@ -284,17 +301,15 @@ export async function importBackup(json: string): Promise<void> {
     transactions?: Transaction[];
     budgets?: Budget[];
     events?: EventItem[];
+    courses?: Course[];
+    settings?: Array<{ key: string; value: string }>;
   };
   if (!Array.isArray(data.accounts) || !Array.isArray(data.transactions)) {
     throw new ValidationError('errors.backupInvalid');
   }
   await db.transaction(
     'rw',
-    db.accounts,
-    db.categories,
-    db.transactions,
-    db.budgets,
-    db.events,
+    [db.accounts, db.categories, db.transactions, db.budgets, db.events, db.courses, db.settings],
     async () => {
       await Promise.all([
         db.accounts.clear(),
@@ -302,12 +317,18 @@ export async function importBackup(json: string): Promise<void> {
         db.transactions.clear(),
         db.budgets.clear(),
         db.events.clear(),
+        db.courses.clear(),
       ]);
       await db.accounts.bulkPut(data.accounts ?? []);
       await db.categories.bulkPut(data.categories ?? []);
       await db.transactions.bulkPut(data.transactions ?? []);
       await db.budgets.bulkPut(data.budgets ?? []);
       await db.events.bulkPut(data.events ?? []);
+      await db.courses.bulkPut(data.courses ?? []);
+      // 设置不清空：AI 的 API Key 是本机的，不该被一份别处导出的备份覆盖掉。
+      for (const s of data.settings ?? []) {
+        if (s?.key && s.key !== 'ai.config') await db.settings.put(s);
+      }
     },
   );
 }
@@ -440,4 +461,133 @@ export async function importCsvText(text: string): Promise<{ imported: number; s
 
   if (toAdd.length > 0) await db.transactions.bulkAdd(toAdd);
   return { imported, skipped };
+}
+
+/* ---------------------------------------------------------------- 课表 */
+
+/** 课表的全局设置存在 settings 表里，键名固定 */
+const TIMETABLE_META_KEY = 'timetable.meta';
+
+/** 课表草稿：课程编辑表单填的东西（id 为空表示新建） */
+export interface CourseDraft {
+  id?: string;
+  name: string;
+  teacher: string;
+  location: string;
+  color: string;
+  note: string;
+  sessions: CourseSession[];
+}
+
+/** 校验课表草稿 */
+export function validateCourseDraft(draft: CourseDraft): void {
+  if (!draft.name.trim()) throw new ValidationError('errors.courseNameRequired');
+  const sessions = (draft.sessions ?? []).filter((s) => s.weekday >= 1 && s.weekday <= 7);
+  if (!sessions.length) throw new ValidationError('errors.courseSessionRequired');
+  for (const s of sessions) {
+    // 节次必须是正整数且起止有序 —— 界面上是下拉框，理论上填不错，
+    // 但导入/粘贴进来的数据不走下拉框，所以这里兜一道。
+    if (!Number.isInteger(s.startPeriod) || !Number.isInteger(s.endPeriod)) {
+      throw new ValidationError('errors.courseTimeInvalid');
+    }
+    if (s.startPeriod < 1 || s.endPeriod < s.startPeriod || s.endPeriod > 20) {
+      throw new ValidationError('errors.courseTimeInvalid');
+    }
+    if (!Number.isInteger(s.weekFrom) || !Number.isInteger(s.weekTo) || s.weekFrom < 1 || s.weekTo < s.weekFrom) {
+      throw new ValidationError('errors.courseTimeInvalid');
+    }
+  }
+}
+
+export async function listCourses(): Promise<Course[]> {
+  const all = await db.courses.toArray();
+  return all.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+}
+
+export async function createCourse(draft: CourseDraft): Promise<Course> {
+  validateCourseDraft(draft);
+  const base = newCourse();
+  const course: Course = {
+    ...base,
+    id: draft.id || base.id,
+    name: draft.name.trim(),
+    teacher: draft.teacher.trim(),
+    location: draft.location.trim(),
+    color: draft.color || base.color,
+    note: draft.note.trim(),
+    sessions: draft.sessions,
+    createdAt: base.createdAt,
+    updatedAt: base.createdAt,
+  };
+  await db.courses.put(course);
+  return course;
+}
+
+export async function updateCourse(id: string, draft: CourseDraft): Promise<Course> {
+  validateCourseDraft(draft);
+  const old = await db.courses.get(id);
+  if (!old) throw new ValidationError('errors.notFound');
+  const course: Course = {
+    ...old,
+    name: draft.name.trim(),
+    teacher: draft.teacher.trim(),
+    location: draft.location.trim(),
+    color: draft.color || old.color,
+    note: draft.note.trim(),
+    sessions: draft.sessions,
+    updatedAt: new Date().toISOString(),
+  };
+  await db.courses.put(course);
+  return course;
+}
+
+export async function deleteCourse(id: string): Promise<void> {
+  await db.courses.delete(id);
+}
+
+/** 读课表设置；没存过就返回默认值（开学日 = 本周一） */
+export async function loadTimetableMeta(): Promise<TimetableMeta> {
+  const row = await db.settings.get(TIMETABLE_META_KEY);
+  // settings.value 是 unknown（同一张表还存语言、外观等），先确认是字符串
+  if (typeof row?.value !== 'string' || !row.value) return defaultTimetableMeta();
+  try {
+    const parsed = JSON.parse(row.value) as Partial<TimetableMeta>;
+    const fallback = defaultTimetableMeta();
+    const periods = Array.isArray(parsed.periods) && parsed.periods.length ? parsed.periods : fallback.periods;
+    return {
+      termStart: /^\d{4}-\d{2}-\d{2}$/.test(String(parsed.termStart)) ? String(parsed.termStart) : fallback.termStart,
+      totalWeeks: Math.max(1, Math.min(30, Number(parsed.totalWeeks) || fallback.totalWeeks)),
+      periods: periods
+        .filter((p) => p && Number.isFinite(Number(p.index)))
+        .map((p) => ({ index: Number(p.index), start: String(p.start), end: String(p.end) }))
+        .sort((a, b) => a.index - b.index),
+    };
+  } catch {
+    // 设置项坏了不该让整个课表页打不开 —— 退回默认值，用户重设一次即可。
+    return defaultTimetableMeta();
+  }
+}
+
+export async function saveTimetableMeta(meta: TimetableMeta): Promise<void> {
+  const clean: TimetableMeta = {
+    termStart: meta.termStart,
+    totalWeeks: clampWeek(meta, meta.totalWeeks) >= 1 ? Math.max(1, Math.min(30, meta.totalWeeks)) : 20,
+    periods: meta.periods,
+  };
+  await db.settings.put({ key: TIMETABLE_META_KEY, value: JSON.stringify(clean) });
+}
+
+/** 批量写入课程（导入课表用）；同名的先删后加，避免重复导入出一堆重名课 */
+export async function importCourses(courses: Course[], replaceSameName = true): Promise<number> {
+  if (!courses.length) return 0;
+  await db.transaction('rw', db.courses, async () => {
+    if (replaceSameName) {
+      const names = new Set(courses.map((c) => c.name));
+      const existing = await db.courses.toArray();
+      const doomed = existing.filter((c) => names.has(c.name)).map((c) => c.id);
+      if (doomed.length) await db.courses.bulkDelete(doomed);
+    }
+    await db.courses.bulkPut(courses);
+  });
+  return courses.length;
 }

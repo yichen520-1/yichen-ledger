@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { Account, Budget, Category, Settings, Transaction } from '../domain/model';
 import type { EventItem } from '../domain/schedule';
+import type { Course } from '../domain/timetable';
 
 /**
  * 本地数据库（IndexedDB）。
@@ -14,6 +15,7 @@ export class LedgerDB extends Dexie {
   budgets!: Table<Budget, string>;
   settings!: Table<Settings, string>;
   events!: Table<EventItem, string>;
+  courses!: Table<Course, string>;
 
   constructor(name = 'yichen-ledger') {
     super(name);
@@ -34,6 +36,18 @@ export class LedgerDB extends Dexie {
       budgets: 'id, categoryId, month',
       settings: 'key',
       events: 'id, date, done',
+    });
+    // v3 加课表。同样只加表不改表：老用户的账本和日程一条不动。
+    // 课表的「开学日期 / 节次时间表」不单独建表，塞进 settings —— 它是全局单例，
+    // 一个键一个值就够，为它建表反而要写一堆「只有一行」的读写代码。
+    this.version(3).stores({
+      accounts: 'id, kind, archived, sort',
+      categories: 'id, type, sort',
+      transactions: 'id, date, type, categoryId, accountId, toAccountId',
+      budgets: 'id, categoryId, month',
+      settings: 'key',
+      events: 'id, date, done',
+      courses: 'id, name',
     });
   }
 }
