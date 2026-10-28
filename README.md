@@ -3,9 +3,9 @@
 一个**本地优先**的个人记账应用：一套代码，同时运行在 **Android / iOS / Windows / macOS** 上。
 数据全部保存在你自己的设备里（IndexedDB），不经过任何服务器。
 
-> 当前版本 `v0.6.0`：把界面上所有的黑框换成了 iOS 26 那种水晶玻璃——底层铺一层有颜色的暗，面板才透得出光；顺带第一次有了真正的浅色主题（跟随系统 / 深色 / 浅色三选一），玻璃强度合并成一个 0~150 的滑块。
+> 当前版本 `v0.7.0`：一个 App 拆成了两个 —— 「忆尘记账」和「忆尘日程」各有自己的江南风图标，桌面端并排放在侧边栏、手机端在底部导航互相串门；日程里多了一张**课表**，拍照或贴图就能把课表录进来，开学日期、节次时间、单双周都跟着算。忆小尘的入口也变成能拖着走的悬浮球。
 
-![界面预览：桌面版总览与手机版总览、记一笔、统计、日程、忆小尘](docs/screenshots/preview.png)
+![界面预览：桌面版忆小尘与手机版总览、记一笔、统计、日程、课表、忆小尘](docs/screenshots/preview.png)
 
 | 应用图标 | 四端一致性 |
 | --- | --- |
@@ -105,6 +105,10 @@
 - **水晶玻璃界面**（v0.6.0）：所有面板级元素（卡片、弹层、侧边栏、底部导航、对话框）统一成 iOS 26 那种液态玻璃——半透 + 模糊 + 提饱和、顶部一道内高光、一圈极细亮边、一层柔和投影；底层铺一层固定的水墨光斑，玻璃才「有东西可透」
 - **浅色主题**（v0.6.0）：跟随系统 / 深色 / 浅色三选一。不是把深色反过来——浅色下靠暗色描边和投影把面板托起来，透明度公式和深色方向相反
 - **玻璃强度**（v0.6.0）：一个 0~150 的滑块（0 = 实心省电，100 = 出厂，150 = 最通透），模糊和饱和度跟着一起走；老设置会自动迁移
+- **两个 App，两枚图标**（v0.7.0）：原来那个「切换功能」的胶囊删掉了，改成两枚真图标并排——桌面端在侧边栏，手机端在底部导航只露另一个 App 的图标。忆尘日程有了自己的江南风图标（白墙黛瓦、一叶小舟、烟雨里一枚朱红的「程」印），和忆尘记账的水墨图标是一套气质
+- **忆小尘可拖**（v0.7.0）：右下角那颗按钮按住就能拖，松手自动吸到最近的左右边缘，位置按比例存进库里——换屏幕尺寸、转屏都还在原来的相对高度
+- **课表**（v0.7.0）：忆尘日程里多一个「课表」标签。七列星期 × 节次的网格，支持单双周、周次范围、开学日期与总周数、可自定义的节次时间表；今日剩余课程、冲突提示、单双周图例都在一屏里
+- **从图片建课表**（v0.7.0）：拍一张或贴一张课程表，填了 API Key 走云端多模态（要求返回 JSON，因为一门课有多个时段），没填就走本机规则解析；解析出来的候选逐条勾选再导入，重名课程可以选择覆盖
 - **离线 & 隐私**：无网络依赖、无账号、无埋点
 
 ---
@@ -186,7 +190,7 @@ npm run electron
 
 ### 自检脚本
 
-仓库里带了十一个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
+仓库里带了十一个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑（另有几个只出图不断言的截图脚本，见下）：
 
 ```bash
 npm run build
@@ -196,7 +200,7 @@ node scripts/flows.mjs              # 深流程：预算超支、建账户、改
 node scripts/pwa-check.mjs          # 网页版：manifest、图标、SW 缓存、断网后还能打开
 node scripts/live-check.mjs         # 直接打线上 Pages 地址，端到端验证线上那份能用
 node scripts/appearance-check.mjs   # 设置页四组、切语言、上传壁纸、分区独立生效
-node scripts/schedule-check.mjs     # 忆尘日程：模式切换、月/周/日视图、增删改、搜索、持久化
+node scripts/schedule-check.mjs     # 忆尘日程 + 课表：双 App 入口、月/周/日视图、课表网格、增删改、持久化
 node scripts/assistant-check.mjs    # 忆小尘：入口位置、问账、记一笔要确认、切模式不丢对话
 node scripts/chat-check.mjs         # 忆小尘闲聊：问候、情绪、算术、报时，且不抢走记账
 node scripts/cloud-chat-check.mjs   # 云端链路：假 OpenAI 服务，验请求内容、历史、兜底
@@ -213,6 +217,10 @@ node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edat
 `scripts/pwa-check.mjs` 会：断言 manifest 能被解析且 display 是 standalone → 四个图标都能下载 → Service Worker 进入 `activated` → 缓存里真的有 index.html 和带 hash 的 JS → **切到离线模式后刷新，页面照样能打开**。最后一项是网页版能不能「装到主屏当 App 用」的关键。
 
 `scripts/live-check.mjs` 不走本地，直接打开 <https://yichen520-1.github.io/yichen-ledger/>：记一笔 66.66 元、断言净资产跟着变、四个子页面都能渲染、SW 已注册、没有控制台错误。用来确认**部署上去的那一份**（而不是本地 dist）真的可用。发布之后跑一次最踏实。
+
+`scripts/schedule-check.mjs` 的课表部分会：断言网格格子数正好是「节次 × 7」、七个星期表头齐全、窄屏下卡片不横向溢出（`overflow` 生效且可以横滚）、第几周显示正确、加一门课之后刷新页面课程还在。
+
+另外两个**只出图不断言**的脚本：`node scripts/schedule-shot.mjs` 出日程的月/周/日三视图，`node scripts/timetable-shot.mjs` 出课表在手机与桌面两种宽度下的样子（含课表设置面板和加课面板），都存到 `.shots/`。`scripts/make-screenshots.py` 再把它们拼成 `docs/screenshots/preview.png`。
 
 `scripts/appearance-check.mjs` 专门盯 v0.2.0 的新东西：设置页四组齐全 → 本地存储横幅在 → 语言下拉切到英文后导航文字和
 `<html lang>` 一起变 → 字号基准调到 120% 后实际字号变大 → 用 canvas 现场生成一张图当壁纸上传 →
@@ -527,7 +535,7 @@ docs/releases/v0.2.0.md
 > 这一步不能省：Service Worker 是页面加载完才注册的，第一次加载的 JS
 > 根本不经过它，不预缓存的话「装完马上断网」会白屏。
 >
-> 换了资源就要让用户拿到新版本，所以缓存名 `CACHE = 'yichen-ledger-v1'`
+> 换了资源就要让用户拿到新版本，所以缓存名 `CACHE = 'yichen-ledger-v8'`
 > 改动后要顺手升个号。Electron（`file://`）和 Capacitor（`https://localhost`）
 > 里会跳过注册，靠 `window.Capacitor` 判断，避免壳里读到旧缓存。
 
@@ -541,6 +549,8 @@ src/
   domain/schedule.ts     日程的纯逻辑：重复规则展开、跨天/全天、提醒时间、视图分栏
   domain/ocr.ts          把识别出来的文字猜成日程（纯函数，可单测）
   domain/assistant.ts    忆小尘的本地规则引擎：问账、记一笔、问日程、找空档（纯函数，可单测）
+  domain/timetable.ts    课表的纯逻辑：周次换算、单双周、一周课块、冲突检测、今日剩余（纯函数，可单测）
+  domain/timetableOcr.ts 把识别出来的文字猜成课表条目（纯函数，可单测）
   db/index.ts            Dexie 表结构与默认账户/分类
   db/repository.ts       所有增删改查、导入导出（错误只抛错误码，翻译留在界面层）
   i18n/                  中 / 英 / 日三份词典 + useI18n / useErrorText
@@ -553,8 +563,10 @@ src/
   state/ai.ts            云端 AI 配置（Base URL、模型、Key），没配就走本地
   pages/                 总览 / 记一笔 / 统计 / 预算 / 我的 / 账户 / 分类
   pages/Schedule.tsx     忆尘日程主页面（月 / 周 / 日三视图）
-  pages/schedule/        日程的弹层组件（表单、搜索、图片识别）
+  pages/schedule/        日程与课表：ScheduleShell（日程/课表两个标签）、TimetablePage、弹层组件（表单、搜索、图片识别）
   components/AssistantPanel.tsx 忆小尘的对话框（portal 到 body）
+  components/AssistantFab.tsx   忆小尘的入口悬浮球（可拖动、吸边、位置存库）
+  components/AppRail.tsx 两个 App 的图标入口（桌面端并排 / 手机端只露另一个）
   components/AssistantHost.tsx  对话框的开关状态，供 App 与页面共用
   components/Toast.tsx   轻提示
   components/Sheet.tsx   底部弹层（portal 到 body，避免被 transform 祖先困住）
@@ -563,9 +575,11 @@ src/
 public/
   manifest.webmanifest   PWA 清单（名字、图标、快捷方式）
   sw.js                  Service Worker：离线缓存
-  pwa-*.png              网页版图标
+  pwa-*.png              网页版图标（忆尘记账）
+  schedule-*.png         忆尘日程的图标（由 scripts/make-schedule-icon.py 生成）
 tests/domain.test.ts     记账领域层单元测试
 tests/schedule.test.ts   日程领域层单元测试（重复规则、视图分栏、OCR 猜时间）
+tests/timetable.test.ts  课表领域层单元测试（周次、单双周、课块、冲突、OCR 猜节次）
 tests/assistant.test.ts  忆小尘规则引擎单元测试（时间区间、分类匹配、记账解析、找空档）
 electron/main.cjs        桌面端主进程
 capacitor.config.ts      移动端配置
