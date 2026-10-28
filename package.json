@@ -13,6 +13,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "check:installed": "node scripts/installed-check.mjs",
     "test:watch": "vitest",
     "electron": "electron .",
     "pack:win": "npm run build && electron-builder --win --config electron-builder.config.cjs --publish never",

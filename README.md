@@ -183,7 +183,7 @@ npm run electron
 
 ### 自检脚本
 
-仓库里带了十个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
+仓库里带了十一个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
 
 ```bash
 npm run build
@@ -197,6 +197,7 @@ node scripts/schedule-check.mjs     # 忆尘日程：模式切换、月/周/日�
 node scripts/assistant-check.mjs    # 忆小尘：入口位置、问账、记一笔要确认、切模式不丢对话
 node scripts/chat-check.mjs         # 忆小尘闲聊：问候、情绪、算术、报时，且不抢走记账
 node scripts/cloud-chat-check.mjs   # 云端链路：假 OpenAI 服务，验请求内容、历史、兜底
+node scripts/installed-check.mjs    # 本机装的桌面版是不是当前这份（发版后必跑）
 
 # 或者验证桌面端（Electron 直接加载 dist/index.html）
 node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edata scripts/electron-check.cjs
@@ -232,6 +233,13 @@ node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edat
 真的把 Key 填进设置 → 断言徽标变「云端」→ 闲聊与开放问题确实发了 POST →
 **请求体里带着账本摘要和前三轮对话** → 数据类问题仍然本地算、不发请求 →
 云端返回 500 时显示「云端没答上来（原因）」并保住本地答案 → 云端挂了打招呼仍有人接。
+
+`scripts/installed-check.mjs` 盯一个很蠢但很容易犯的错：**发完版忘了重装本机那份**。
+它会打开 `%LOCALAPPDATA%\Programs\yichen-ledger\resources\app.asar`，
+读出里面 `dist/index.html` 引用的 bundle 名，和当前 `dist/` 比对。
+不一致就说明你看到的是旧界面 —— v0.5.0 发完后就踩过这个坑：
+代码、网页版、Release 全对，只有本机那份还是 v0.4.0，看起来像「修了个寂寞」。
+加 `--strict` 时不一致会以非 0 退出。
 
 ### 推送代码时如果连不上 GitHub
 
