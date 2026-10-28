@@ -23,16 +23,17 @@ OUT = ROOT / "docs" / "screenshots"
 RADIUS_RATIO = 0.045
 BORDER = (255, 255, 255, 26)  # 半透明白色描边，深色主题下是一道细高光
 
-# 预览图里从左到右的四张手机截图
+# 预览图里从左到右的手机截图
 PHONES = [
     ("m-01-home.png", "总览"),
     ("m-02b-add-filled.png", "记一笔"),
     ("m-04-stats.png", "统计"),
     ("m-schedule-month.png", "日程"),
+    ("assistant-chat.png", "忆小尘"),
 ]
 DESKTOP = ("d-01-home.png", "桌面版")
 
-PANEL_W = 295          # 每张手机图缩放后的宽度
+PANEL_W = 232          # 每张手机图缩放后的宽度
 DESKTOP_W = 1220       # 桌面图缩放后的宽度
 GAP = 18
 PAD = 0                # 画布外边距，0 = 让圆角贴边，README 里更好排
