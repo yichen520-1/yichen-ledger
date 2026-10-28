@@ -3,12 +3,19 @@
 buildscript {
     
     repositories {
-        // 阿里云镜像放前面：国内直连 mavenCentral 经常超时导致构建失败，
-        // 镜像没命中时会自动回落到下面的 google() / mavenCentral()
-        maven { url 'https://maven.aliyun.com/repository/google' }
-        maven { url 'https://maven.aliyun.com/repository/public' }
+        // 官方仓库必须排在最前面。
+        //
+        // 之前把阿里云镜像放前面，是为了国内直连 mavenCentral 超时的问题；
+        // 但 Gradle 的仓库回落只在「找不到」时生效，**遇到 5xx 会直接判定构建失败**。
+        // v0.5.0 的 Android 构建就因此挂过一次：aliyun 的 google 镜像返回 502，
+        // 明明 mavenCentral 上有这个包，Gradle 却没有往下试。
+        //
+        // CI 的 runner 在国外，官方源本来就快；国内本地构建慢一点也比构建失败好。
         google()
         mavenCentral()
+        // 兜底镜像放在最后，官方源真的缺包时才轮到它
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.7.2'
@@ -23,10 +30,10 @@ apply from: "variables.gradle"
 
 allprojects {
     repositories {
-        maven { url 'https://maven.aliyun.com/repository/google' }
-        maven { url 'https://maven.aliyun.com/repository/public' }
         google()
         mavenCentral()
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
     }
 }
 
