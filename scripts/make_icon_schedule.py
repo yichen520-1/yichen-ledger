@@ -1,11 +1,11 @@
-"""「忆尘日程」的江南风图标。
+"""「忆笺日程」的江南风图标。
 
 和主图标（水墨「忆」字 + 远山飞雁）同一套纸、墨、印，但意象换成江南水乡：
 
     白墙黛瓦的马头墙  ·  一叶小舟  ·  烟雨
 
 为什么是这三样：
-    「忆尘」是旧纸与灯，所以主图标走的是山与雁；
+    「忆笺」是旧纸与灯，所以主图标走的是山与雁；
     「日程」管的是日子，江南的日子是水边的日子 —— 墙是白的、瓦是黑的、
     雨是斜的、船是慢的。三样东西各自都是极简的剪影，缩到 48px 也还认得出。
 
@@ -245,7 +245,7 @@ def _boat(d: ImageDraw.ImageDraw, s: float, cx: float, cy: float, length: float)
 
 
 def draw_schedule_icon(size: int = SIZE, *, full_bleed: bool = False, transparent: bool = False) -> Image.Image:
-    """画「忆尘日程」的图标。
+    """画「忆笺日程」的图标。
 
     full_bleed / transparent 的语义和主图标的 draw_icon 一致：
       full_bleed=True  直角铺满，给 Android legacy 图标；

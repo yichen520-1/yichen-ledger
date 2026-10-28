@@ -1,14 +1,14 @@
-"""把「忆尘日程」的图标出成四端要的全套尺寸。
+"""把「忆笺日程」的图标出成四端要的全套尺寸。
 
 和 make-icon.py 的分工：
-  make-icon.py           出「忆尘记账」的主图标（Windows/macOS/iOS/Android 的 App 图标）
+  make-icon.py           出「忆笺记账」的主图标（Windows/macOS/iOS/Android 的 App 图标）
   make-pwa-assets.py     出网页版的主图标（favicon / PWA）
   make_icon_schedule.py  只负责画（纯函数）
   make-schedule-icon.py  ← 本文件，负责落盘
 
 日程是站内的第二个 App，不是独立的安装包 —— 所以它只需要
 **网页/PWA 那一套尺寸**，加一份给侧边栏用的小图。
-桌面安装包和手机 App 的图标仍然是「忆尘记账」那枚，因为装到系统里的
+桌面安装包和手机 App 的图标仍然是「忆笺记账」那枚，因为装到系统里的
 只有记账这一个 App，日程是它里面的一页。
 """
 

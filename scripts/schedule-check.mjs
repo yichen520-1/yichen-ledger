@@ -1,5 +1,5 @@
 /**
- * 忆尘日程自检：双 App 入口（AppRail）、日程/课表两个标签、月视图、新建日程、
+ * 忆笺日程自检：双 App 入口（AppRail）、日程/课表两个标签、月视图、新建日程、
  * 重复规则、搜索、课表网格与加课。
  *
  * 用法：先 `npm run build && npx vite preview --port 4173`，再 node scripts/schedule-check.mjs
@@ -67,7 +67,7 @@ const tabApp = await page.evaluate(() => {
 });
 check('底部导航有「去另一个 App」的图标按钮', tabApp !== null);
 check('该按钮只放图标不放文字', tabApp?.text === '', `text="${tabApp?.text}"`);
-check('按钮的无障碍名是目标 App 全名', tabApp?.label === '忆尘日程', String(tabApp?.label));
+check('按钮的无障碍名是目标 App 全名', tabApp?.label === '忆笺日程', String(tabApp?.label));
 check('按钮里是真的 App 图标', /schedule-badge\.png$/.test(tabApp?.src ?? ''), tabApp?.src);
 check('图标按钮尺寸合理', (tabApp?.w ?? 0) >= 26 && (tabApp?.h ?? 0) >= 26, `${tabApp?.w}x${tabApp?.h}`);
 
@@ -91,7 +91,7 @@ const rail = await page.evaluate(() => {
   };
 });
 check('侧边栏 AppRail 有两块', rail.count === 2, String(rail.count));
-check('两块的名字是「忆尘记账 / 忆尘日程」', rail.names.join('/') === '忆尘记账/忆尘日程', rail.names.join('/'));
+check('两块的名字是「忆笺记账 / 忆笺日程」', rail.names.join('/') === '忆笺记账/忆笺日程', rail.names.join('/'));
 check('两块各自带标语', rail.taglines[0] === '所记皆来路，所忆皆无尘' && rail.taglines[1] === '所行皆有期，所至皆有时', rail.taglines.join(' | '));
 check('两块用的是各自 App 的真实图标', rail.icons.join(',').includes('pwa-192.png') && rail.icons.join(',').includes('schedule-badge.png'), rail.icons.join(','));
 check('当前 App 高亮在第一块', rail.onIndex === 0, String(rail.onIndex));
@@ -118,7 +118,7 @@ const afterSwitch = await page.evaluate(() => ({
   bottom: [...document.querySelectorAll('.tabbar .tab:not(.tab-app)')].map((b) => b.textContent.trim()),
 }));
 check('切到日程后路由正确', afterSwitch.hash.startsWith('#/schedule'), afterSwitch.hash);
-check('日程页标题', afterSwitch.title === '忆尘日程', afterSwitch.title);
+check('日程页标题', afterSwitch.title === '忆笺日程', afterSwitch.title);
 check('页面里不再有胶囊标签', afterSwitch.legacyTabs === 0, String(afterSwitch.legacyTabs));
 check('手机底部导航是 日程/课表/设置', afterSwitch.bottom.join('/') === '日程/课表/设置', afterSwitch.bottom.join('/'));
 check('月视图渲染', afterSwitch.hasMonth);
