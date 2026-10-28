@@ -14,7 +14,7 @@
  *     这样既能第一时间拿到新版本，离线也不白屏。
  */
 
-const CACHE = 'yichen-ledger-v3';
+const CACHE = 'yichen-ledger-v4';
 
 /** 从 index.html 里抠出所有需要预缓存的同源资源地址 */
 function assetsFromHtml(html, base) {
