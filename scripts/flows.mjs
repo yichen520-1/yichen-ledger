@@ -163,9 +163,25 @@ try {
   const afterReload = await page.$eval('main', (el) => el.innerText);
   check('刷新后分类仍在（IndexedDB 持久化）', afterReload.includes('咖啡'));
 
-  // ---------- 7. 深色主题变量 ----------
-  const bg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());
-  check('主题变量已加载', bg === '#0f1216', bg);
+  // ---------- 7. 主题变量 ----------
+  /*
+   * v0.6.0 起有两套主题，跟着系统走（AppearanceContext 写 data-theme）。
+   * 所以这里不能再硬断言深色的 --bg：跑测试的机器若是浅色系统，
+   * 拿到的是 #eef1f6，断言就假失败了。改成「必须是这两套之一」，
+   * 再确认玻璃材质的那几个变量确实算出了具体值（不是空字符串）。
+   */
+  const palette = await page.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    return {
+      bg: cs.getPropertyValue('--bg').trim(),
+      theme: document.documentElement.getAttribute('data-theme'),
+      fill: cs.getPropertyValue('--glass-fill-alpha').trim(),
+      blur: cs.getPropertyValue('--glass-blur-px').trim(),
+    };
+  });
+  const bgOk = palette.bg === '#0f1216' || palette.bg === '#eef1f6';
+  check('主题变量已加载', bgOk, `${palette.bg} · ${palette.theme ?? 'dark'}`);
+  check('玻璃材质变量已生效', Boolean(palette.fill && palette.blur), `${palette.fill} / ${palette.blur}`);
 } finally {
   await browser.close();
 }
