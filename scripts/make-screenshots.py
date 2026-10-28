@@ -1,9 +1,9 @@
 r"""把 .shots/ 里的自检截图拼成 README 用的预览图。
 
-自检脚本 (smoke.mjs / flows.mjs) 生成的原始截图体积大、尺寸也不统一，
-直接塞进仓库既费流量、在 GitHub 上排版也难看。这里把它们拼成一张
-`docs/screenshots/preview.png` —— 上方桌面版、下方三张手机版，
-圆角 + 描边，背景透明，深浅色主题下都不违和。
+自检脚本 (smoke.mjs / flows.mjs / sched-shots.mjs) 生成的原始截图体积大、
+尺寸也不统一，直接塞进仓库既费流量、在 GitHub 上排版也难看。这里把它们拼成一张
+`docs/screenshots/preview.png` —— 上方桌面版、下方四张手机版（总览 / 记一笔 /
+统计 / 日程），圆角 + 描边，背景透明，深浅色主题下都不违和。
 
 用 harness 自带的 python 跑（系统 python 没有 Pillow）：
 
@@ -23,17 +23,18 @@ OUT = ROOT / "docs" / "screenshots"
 RADIUS_RATIO = 0.045
 BORDER = (255, 255, 255, 26)  # 半透明白色描边，深色主题下是一道细高光
 
-# 预览图里从左到右的三张手机截图
+# 预览图里从左到右的四张手机截图
 PHONES = [
     ("m-01-home.png", "总览"),
     ("m-02b-add-filled.png", "记一笔"),
     ("m-04-stats.png", "统计"),
+    ("m-schedule-month.png", "日程"),
 ]
 DESKTOP = ("d-01-home.png", "桌面版")
 
-PANEL_W = 380          # 每张手机图缩放后的宽度
+PANEL_W = 295          # 每张手机图缩放后的宽度
 DESKTOP_W = 1220       # 桌面图缩放后的宽度
-GAP = 20
+GAP = 18
 PAD = 0                # 画布外边距，0 = 让圆角贴边，README 里更好排
 
 
@@ -80,7 +81,7 @@ def main() -> None:
     # 桌面图居中放上面
     canvas.alpha_composite(desk, ((canvas_w - desk.width) // 2, PAD))
 
-    # 三张手机图并排放下方，整体居中
+    # 手机图并排放下方，整体居中
     x = (canvas_w - row_w) // 2
     y = PAD + desk.height + GAP
     for panel in panels:

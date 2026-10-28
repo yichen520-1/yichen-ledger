@@ -3,7 +3,7 @@
 一个**本地优先**的个人记账应用：一套代码，同时运行在 **Android / iOS / Windows / macOS** 上。
 数据全部保存在你自己的设备里（IndexedDB），不经过任何服务器。
 
-> 当前版本 `v0.2.0`：新增设置中心、中/英/日三语、外观自定义与 iOS 手感动画。
+> 当前版本 `v0.3.0`：新增「忆尘日程」——侧边栏一键切换工作区，月/周/日视图、重复规则、图片识别建日程、到点提醒。
 
 ![界面预览：桌面版总览与手机版总览、记一笔、统计](docs/screenshots/preview.png)
 
@@ -21,11 +21,11 @@
 
 | 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows | `yichen-ledger-0.2.0-win-x64.exe` | 安装版，可选安装目录 |
-| Windows | `yichen-ledger-0.2.0-win-x64.zip` | 免安装，解压即用 |
-| macOS（Apple 芯片） | `yichen-ledger-0.2.0-mac-arm64.dmg` | M1/M2/M3/M4 |
-| macOS（Intel） | `yichen-ledger-0.2.0-mac-x64.dmg` | 老款 Mac |
-| Linux | `yichen-ledger-0.2.0-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
+| Windows | `yichen-ledger-0.3.0-win-x64.exe` | 安装版，可选安装目录 |
+| Windows | `yichen-ledger-0.3.0-win-x64.zip` | 免安装，解压即用 |
+| macOS（Apple 芯片） | `yichen-ledger-0.3.0-mac-arm64.dmg` | M1/M2/M3/M4 |
+| macOS（Intel） | `yichen-ledger-0.3.0-mac-x64.dmg` | 老款 Mac |
+| Linux | `yichen-ledger-0.3.0-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
 | Android | `app-debug.apk` | 手机浏览器下载后点安装 |
 | iOS | `yichen-ledger-unsigned.ipa` | **未签名**，需自行重签，见下方说明 |
 
@@ -95,6 +95,9 @@
   对比度、饱和度、缩放、偏移、透明度、暗化、适配方式、水平翻转；外加全局字体风格、字号基准、
   文字颜色、强调色、圆角、玻璃面板
 - **iOS 手感**（v0.2.0）：页面横向 push/pop、列表交错淡入、按下回弹、弹层阻尼，尊重系统的「减少动态效果」
+- **忆尘日程**（v0.3.0）：侧边栏与底部导航的模式切换钮，一键在「记账 / 日程」之间换整个工作区；月 / 周 / 日三种视图；全天、时间区间、地点、标签、颜色、备注；每天 / 每周 / 每月 / 每年的重复规则（含自定义间隔与重复日）；勾选完成、搜索、删除
+- **从图片建日程**（v0.3.0）：拍一张课程表或会议通知，填了 API Key 走云端多模态，没填就走本机 OCR（tesseract.js，第一次用要下语言包）
+- **到点提醒**（v0.3.0）：Android / iOS 走系统本地通知，App 关着也能弹；网页版退化成页面内提醒，并明确告知这个限制
 - **离线 & 隐私**：无网络依赖、无账号、无埋点
 
 ---
@@ -144,6 +147,8 @@
 ### 5. 平台特性
 - [ ] **生物识别锁**：Face ID / 指纹 / Windows Hello
 - [x] **多语言**：中文 / 英文 / 日文（v0.2.0 已做）
+- [x] **日程 / 日历模块**：月 / 周 / 日视图、重复规则、图片识别（v0.3.0 已做）
+- [ ] **日程与账单打通**：把「还信用卡」这类日程一键生成周期账单
 - [ ] **浅色主题**（当前是深色优先，但壁纸、配色、字体已经可以自定义）
 - [ ] **桌面端系统托盘常驻 + 开机自启**
 
@@ -172,7 +177,7 @@ npm run electron
 
 ### 自检脚本
 
-仓库里带了六个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
+仓库里带了七个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑：
 
 ```bash
 npm run build
@@ -182,6 +187,7 @@ node scripts/flows.mjs              # 深流程：预算超支、建账户、改
 node scripts/pwa-check.mjs          # 网页版：manifest、图标、SW 缓存、断网后还能打开
 node scripts/live-check.mjs         # 直接打线上 Pages 地址，端到端验证线上那份能用
 node scripts/appearance-check.mjs   # 设置页四组、切语言、上传壁纸、分区独立生效
+node scripts/schedule-check.mjs     # 忆尘日程：模式切换、月/周/日视图、增删改、搜索、持久化
 
 # 或者验证桌面端（Electron 直接加载 dist/index.html）
 node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edata scripts/electron-check.cjs
@@ -198,6 +204,10 @@ node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edat
 `scripts/appearance-check.mjs` 专门盯 v0.2.0 的新东西：设置页四组齐全 → 本地存储横幅在 → 语言下拉切到英文后导航文字和
 `<html lang>` 一起变 → 字号基准调到 120% 后实际字号变大 → 用 canvas 现场生成一张图当壁纸上传 →
 **只有主内容区出现壁纸、侧边栏仍为空**（验证三区域独立）→ 回总览后壁纸还在。
+
+`scripts/schedule-check.mjs` 盯 v0.3.0：默认是记账模式且导航是六项 → 侧边栏有模式切换钮 → 切过去后路由是 `#/schedule`、
+导航换成「日程 / 设置」→ 月视图 42 格、周标题从周一开始 → 新建一条日程后列表里出现且时间正确 → 勾选后标记完成 →
+周视图 7 列、日视图有日期标题 → 搜索能命中 → 切回记账模式回到总览 → 刷新后仍停在日程模式。
 
 ### 推送代码时如果连不上 GitHub
 
@@ -266,8 +276,8 @@ python scripts/make-pwa-assets.py       # 网页版用的那几张 PNG
 「忆」，马善政毛笔楷书备用），只用来生成图标，不进安装包。印章上的「记」用
 宋体加粗后做刀刻处理 —— 本机没有篆书字体，篆书虽是印章正体，但装不上就算了。
 
-产物结构：`yichen-ledger-0.2.0-win-x64.exe`（约 88 MB，可选安装目录）、
-`yichen-ledger-0.2.0-win-x64.zip`（免安装，约 112 MB）。
+产物结构：`yichen-ledger-0.3.0-win-x64.exe`（约 88 MB，可选安装目录）、
+`yichen-ledger-0.3.0-win-x64.zip`（免安装，约 112 MB）。
 
 > **排坑：别在项目目录里跑产出的安装包。** NSIS 生成卸载程序时会执行一次
 > 自己产出的安装包。如果安装包就躺在项目目录里（比如
@@ -314,7 +324,7 @@ executableName: 'yichen-ledger', // 程序目录名、可执行文件名 —— 
 
 | 平台 | 磁盘上的名字 | 用户看到的名字 |
 | --- | --- | --- |
-| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆尘记账」，窗口标题「忆尘记账」，控制面板「忆尘记账 0.2.0」 |
+| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆尘记账」，窗口标题「忆尘记账」，控制面板「忆尘记账 0.3.0」 |
 | macOS | `/Applications/yichen-ledger.app` | Finder、启动台、Dock 显示「忆尘记账」（来自 `CFBundleName` / `CFBundleDisplayName`） |
 | Linux | `yichen-ledger` 可执行文件 + `*.AppImage` | 应用菜单里显示「忆尘记账」（`.desktop` 的 `Name`） |
 | Android / iOS | `com.yichen.ledger` | 桌面图标下的名字「忆尘记账」 |
@@ -416,8 +426,8 @@ npx cap open ios         # 在 Xcode 里运行 / 打包
 把这一步交给 GitHub Actions —— 它三种系统的 runner 都有：
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 推一个 `v*` 的 tag 就会并行跑五个任务，然后建一个 Release，把产物挂上去：
@@ -493,12 +503,19 @@ docs/releases/v0.2.0.md
 ```
 src/
   domain/model.ts        纯领域逻辑：金额、日期、汇总、CSV（无框架依赖，可单测）
+  domain/schedule.ts     日程的纯逻辑：重复规则展开、跨天/全天、提醒时间、视图分栏
+  domain/ocr.ts          把识别出来的文字猜成日程（纯函数，可单测）
   db/index.ts            Dexie 表结构与默认账户/分类
   db/repository.ts       所有增删改查、导入导出（错误只抛错误码，翻译留在界面层）
   i18n/                  中 / 英 / 日三份词典 + useI18n / useErrorText
   state/LedgerContext.tsx 用 useLiveQuery 订阅数据库，写库后全站自动刷新
   state/AppearanceContext.tsx 三区域壁纸、字体、配色，写 CSS 变量并落到 settings 表
+  state/ModeContext.tsx  记账 / 日程两个工作区的切换状态
+  state/notify.ts        到点提醒：原生本地通知 / 网页版降级
+  state/ai.ts            云端 AI 配置（Base URL、模型、Key），没配就走本地
   pages/                 总览 / 记一笔 / 统计 / 预算 / 我的 / 账户 / 分类
+  pages/Schedule.tsx     忆尘日程主页面（月 / 周 / 日三视图）
+  pages/schedule/        日程的弹层组件（表单、搜索、图片识别）
   components/Toast.tsx   轻提示
   components/Sheet.tsx   底部弹层（portal 到 body，避免被 transform 祖先困住）
   components/Backdrop.tsx 单个区域的背景图层
@@ -507,7 +524,8 @@ public/
   manifest.webmanifest   PWA 清单（名字、图标、快捷方式）
   sw.js                  Service Worker：离线缓存
   pwa-*.png              网页版图标
-tests/domain.test.ts     领域层单元测试
+tests/domain.test.ts     记账领域层单元测试
+tests/schedule.test.ts   日程领域层单元测试（重复规则、视图分栏、OCR 猜时间）
 electron/main.cjs        桌面端主进程
 capacitor.config.ts      移动端配置
 build/                   electron-builder 用的图标（由 scripts/make-icon.py 生成）
