@@ -7,9 +7,12 @@
 
 ![界面预览：桌面版忆小尘与手机版总览、记一笔、统计、日程、课表、忆小尘](docs/screenshots/preview.png)
 
-| 应用图标 | 四端一致性 |
+| 忆尘记账 | 忆尘日程 |
 | --- | --- |
-| ![忆尘记账的图标](docs/screenshots/icon.png) | ![Windows、Android、iOS、PWA 上的同一个图标](docs/screenshots/icon-platforms.png) |
+| ![忆尘记账的图标](docs/screenshots/icon.png) | ![忆尘日程的江南风图标](docs/screenshots/icon-schedule.png) |
+
+上面那枚是忆尘日程的图标：白墙黛瓦、一叶小舟、三层烟雨，右下角一枚朱红的「程」印。
+两枚并排是一套气质——一枚墨色、一枚朱色，冷暖对照。
 
 ---
 
