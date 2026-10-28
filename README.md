@@ -190,7 +190,7 @@ npm run electron
 
 ### 自检脚本
 
-仓库里带了十一个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑（另有几个只出图不断言的截图脚本，见下）：
+仓库里带了十个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑（另有两个只出图不断言的截图脚本，见下）：
 
 ```bash
 npm run build
@@ -220,15 +220,17 @@ node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edat
 
 `scripts/schedule-check.mjs` 的课表部分会：断言网格格子数正好是「节次 × 7」、七个星期表头齐全、窄屏下卡片不横向溢出（`overflow` 生效且可以横滚）、第几周显示正确、加一门课之后刷新页面课程还在。
 
-另外两个**只出图不断言**的脚本：`node scripts/schedule-shot.mjs` 出日程的月/周/日三视图，`node scripts/timetable-shot.mjs` 出课表在手机与桌面两种宽度下的样子（含课表设置面板和加课面板），都存到 `.shots/`。`scripts/make-screenshots.py` 再把它们拼成 `docs/screenshots/preview.png`。
+另外两个**只出图不断言**的脚本：`node scripts/assistant-shot.mjs` 出忆小尘的对话面板，`node scripts/timetable-shot.mjs` 出课表在手机与桌面两种宽度下的样子（含课表设置面板和加课面板），都存到 `.shots/`。`scripts/make-screenshots.py` 再把 `.shots/` 里的图拼成 `docs/screenshots/preview.png`。
 
 `scripts/appearance-check.mjs` 专门盯 v0.2.0 的新东西：设置页四组齐全 → 本地存储横幅在 → 语言下拉切到英文后导航文字和
 `<html lang>` 一起变 → 字号基准调到 120% 后实际字号变大 → 用 canvas 现场生成一张图当壁纸上传 →
 **只有主内容区出现壁纸、侧边栏仍为空**（验证三区域独立）→ 回总览后壁纸还在。
 
-`scripts/schedule-check.mjs` 盯 v0.3.0：默认是记账模式且导航是六项 → 侧边栏有模式切换钮 → 切过去后路由是 `#/schedule`、
-导航换成「日程 / 设置」→ 月视图 42 格、周标题从周一开始 → 新建一条日程后列表里出现且时间正确 → 勾选后标记完成 →
-周视图 7 列、日视图有日期标题 → 搜索能命中 → 切回记账模式回到总览 → 刷新后仍停在日程模式。
+`scripts/schedule-check.mjs` 盯 v0.3.0 起的日程与 v0.7.0 起的课表：底部导航里只有一个「另一个 App」的图标、桌面端两枚并排 →
+点过去路由是 `#/schedule`、页面顶部有「日程 / 课表」两个标签 → 月视图 42 格、周标题从周一开始 →
+新建一条日程后列表里出现且时间正确 → 勾选后标记完成 → 周视图 7 列、日视图有日期标题 → 搜索能命中 →
+课表网格格子数正好是「节次 × 7」、窄屏可横滚 → 加一门课后课块出现在正确的星期列、跨正确的行数 →
+刷新后仍停在课表标签、课程还在 → 切回记账模式回到总览。
 
 `scripts/assistant-check.mjs` 盯 v0.4.0：助手按钮只在总览 / 统计 / 日程三个页面出现（记账页不显示，免得挡住数字键盘）→
 没填 Key 时徽标写「本地规则」→ 记两笔后问「这个月花了多少」「哪一类花得最多」「我现在有多少钱」都答得上 →
