@@ -1,7 +1,7 @@
 {
   "name": "yichen-ledger",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "忆尘记账 — a local-first personal finance app for Android, iOS, Windows and macOS",
   "author": "yichen520-1",
   "license": "MIT",
