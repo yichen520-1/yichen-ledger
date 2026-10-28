@@ -1129,6 +1129,21 @@ textarea {
   flex: 1;
 }
 
+/* 行内的紧凑间距：给「起止两个数字框 + 中间的短横」这类组合用 */
+.row.gap.tight {
+  gap: 5px;
+}
+
+/* 删除类按钮：文字用红，不抢主按钮的视线 */
+.btn.danger-text {
+  color: var(--red);
+  border-color: rgba(242, 100, 90, 0.28);
+}
+
+.btn.danger-text:hover {
+  background: rgba(242, 100, 90, 0.1);
+}
+
 .muted {
   color: var(--text-faint);
   font-size: calc(12.5px * var(--font-scale, 1));
@@ -1608,77 +1623,108 @@ textarea {
    忆尘日程
    ================================================================== */
 
-/* 功能切换钮：侧边栏底部两段式胶囊，移动端收成只有图标 */
-.mode-switch {
-  margin: 0 0 10px;
-  padding: 9px 10px;
-  border-radius: 13px;
-  background: var(--bg-elev);
-  border: 1px solid var(--line-soft);
-}
-
-.mode-switch-label {
-  font-size: calc(11px * var(--font-scale, 1));
-  color: var(--text-faint);
-  letter-spacing: 0.06em;
-  margin-bottom: 7px;
-  padding-left: 2px;
-}
-
-.mode-switch-track {
+/*
+ * 双 App 入口（侧边栏）
+ * ------------------------------------------------------------------
+ * 不是「筛选器」，是两个并列的 App：上面一枚真图标（圆角方块，像桌面上的
+ * 应用），下面一行小字。当前所在的那个亮起来，另一个是灰的但可点。
+ *
+ * 图标用的是各自 App 的打包图标（pwa-192.png / schedule-badge.png），
+ * 不是线性图标 —— 线性图标看起来像「功能」，方块图标看起来像「应用」，
+ * 这正是这次改造要的那个感觉。
+ */
+.app-rail {
   display: flex;
-  gap: 4px;
-  /*
-   * 这里原来用 var(--bg)（不透明的 #0f1216），在玻璃卡片里就是一块「黑框」——
-   * 用户截图里指的就是这种。改成半透明白纱，跟整站的玻璃同一套语言。
-   */
-  background: var(--bg-elev-2);
-  border-radius: 9px;
-  padding: 3px;
+  gap: 8px;
+  margin: 4px 0 14px;
 }
 
-.mode-switch-track button {
+.app-tile {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 5px;
-  padding: 7px 6px;
-  border-radius: 7px;
-  color: var(--text-faint);
-  font-size: calc(12px * var(--font-scale, 1));
+  padding: 9px 4px 8px;
+  border-radius: 14px;
+  border: 1px solid transparent;
   transition:
     background var(--dur-fast) var(--ease-out-soft),
-    color var(--dur-fast) var(--ease-out-soft);
+    border-color var(--dur-fast) var(--ease-out-soft),
+    opacity var(--dur-fast) var(--ease-out-soft);
 }
 
-.mode-switch-track button.on {
+.app-tile:hover {
+  background: var(--bg-elev-2);
+}
+
+.app-tile.on {
   background: var(--accent-soft);
+  border-color: rgba(255, 180, 84, 0.3);
+}
+
+/* 没选中的那个压暗一点，让「我现在在哪个 App 里」一眼可读 */
+.app-tile:not(.on) .app-tile-icon {
+  opacity: 0.62;
+}
+
+.app-tile:not(.on):hover .app-tile-icon {
+  opacity: 0.85;
+}
+
+.app-tile-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  overflow: hidden;
+  display: block;
+  /*
+   * 图标自带投影：iOS 桌面上的应用图标都有一层很浅的投影，
+   * 少了它，图标会像贴纸一样浮在玻璃上。
+   */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: opacity var(--dur-fast) var(--ease-out-soft);
+}
+
+.app-tile-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.app-tile-label {
+  font-size: calc(11px * var(--font-scale, 1));
+  color: var(--text-faint);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.app-tile.on .app-tile-label {
   color: var(--accent);
 }
 
-/* 底部导航里的紧凑版：不占一整行，贴在最后 */
-.mode-switch.compact {
-  margin: 0 0 0 2px;
-  padding: 0;
-  background: transparent;
-  border: 0;
+/* 底部导航里的那一枚：只有图标，不占一整个格子的宽度 */
+.tab.tab-app {
   flex: 0 0 auto;
+  justify-content: center;
+  padding: 9px 6px 8px;
+}
+
+.tab-app-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: block;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.28);
   /*
-   * 导航条高度由两侧的 .tab 撑起来（图标 + 文字 ≈ 56px），而这里只有
-   * 30px 高的两个图标。不居中就会贴着顶边，看起来像漏了一截。
+   * 它比两侧的线性图标矮一点（26 vs 20+文字），
+   * 往上顶 4px 让视觉重心和其它 tab 的图标对齐。
    */
-  display: flex;
-  align-items: center;
-}
-
-.mode-switch.compact .mode-switch-track {
-  background: var(--bg-elev);
-  padding: 3px;
-}
-
-.mode-switch.compact .mode-switch-track button {
-  padding: 7px;
+  margin-bottom: 2px;
 }
 
 /* 页头右侧的按钮组 */
@@ -2205,6 +2251,400 @@ select.input {
   font-variant-numeric: tabular-nums;
 }
 
+/* 低置信度提示：一个琥珀色的小三角，hover 出 tooltip */
+.ocr-warn {
+  display: inline-flex;
+  vertical-align: -1px;
+  margin-left: 4px;
+  color: var(--accent);
+}
+
+/* ==================================================================
+   忆尘日程 · 课表
+   ================================================================== */
+
+/* 顶部动作条：设置、导入、加课 */
+.sched-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+/* 页头右侧的「日程 / 课表」两个标签 */
+.sched-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 11px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line-soft);
+  flex: 0 0 auto;
+}
+
+.sched-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  color: var(--text-faint);
+  font-size: calc(12.5px * var(--font-scale, 1));
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease-out-soft),
+    color var(--dur-fast) var(--ease-out-soft);
+}
+
+.sched-tab.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* 周次条上的单双周图例 */
+.tt-parity-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(11px * var(--font-scale, 1));
+  color: var(--text-faint);
+}
+
+.tt-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+/* 单周偏琥珀、双周偏蓝 —— 和课块上的角标同一套色，看久了一眼能对上 */
+.tt-legend-dot.odd {
+  background: rgba(255, 180, 84, 0.75);
+}
+
+.tt-legend-dot.even {
+  background: rgba(90, 169, 240, 0.75);
+}
+
+.tt-legend-dot + .tt-legend-dot,
+.tt-legend-dot:not(:first-child) {
+  margin-left: 4px;
+}
+
+/* 今天还有几节 */
+.tt-today {
+  padding: 11px 13px;
+}
+
+.tt-today-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-dim);
+  margin-bottom: 7px;
+}
+
+.tt-today-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tt-today-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--bg-elev-2);
+  border-left: 2.5px solid var(--c, var(--accent));
+  font-size: calc(11.5px * var(--font-scale, 1));
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.tt-today-chip b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tt-conflict {
+  padding: 11px 13px;
+}
+
+.tt-conflict .banner-main svg {
+  color: var(--accent);
+}
+
+.tt-conflict .banner-title {
+  color: var(--warn-title);
+}
+
+.tt-conflict .banner-body {
+  color: var(--warn-body);
+}
+
+/* 课表本体 */
+.tt-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tt-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* iOS 惯性滚动，横向滚起来跟原生一样跟手 */
+  -webkit-overflow-scrolling: touch;
+}
+
+.tt-grid {
+  display: grid;
+  /*
+   * 第一列是节次（sticky），后面七列等宽。
+   * 最小宽度按 7×66px 算 —— 再窄课名就只剩两三个字了。
+   */
+  grid-template-columns: 44px repeat(7, minmax(66px, 1fr));
+  min-width: 506px;
+}
+
+.tt-corner {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--bg-elev);
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.tt-dayhead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 2px 6px;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 1px solid var(--line-soft);
+}
+
+.tt-dayhead .wd {
+  font-size: calc(11px * var(--font-scale, 1));
+  color: var(--text-dim);
+}
+
+.tt-dayhead .dd {
+  font-size: calc(10px * var(--font-scale, 1));
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.tt-dayhead.today .wd {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tt-dayhead.today .dd {
+  color: var(--accent);
+}
+
+/* 节次列：横向滚动时钉在左边 */
+.tt-period {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  background: var(--bg-elev);
+  border-right: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 4px 2px;
+}
+
+.tt-period b {
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.tt-period span {
+  font-size: calc(9px * var(--font-scale, 1));
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 空网格：可点，点一下就是「在这格加课」 */
+.tt-cell {
+  border-left: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  min-height: 46px;
+  transition: background var(--dur-fast);
+}
+
+.tt-cell:hover {
+  background: var(--bg-elev-2);
+}
+
+/* 课块：占一列、跨若干行 */
+.tt-block {
+  position: relative;
+  margin: 2px;
+  padding: 5px 6px;
+  border-radius: 9px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  /*
+   * 颜色来自课程自己的 --c，调成半透明的一层底 + 左侧实色竖条：
+   * 七列并排时如果每块都铺满实色，整张表会花到看不清课名。
+   */
+  background: color-mix(in srgb, var(--c, #ffb454) 22%, transparent);
+  border-left: 3px solid var(--c, #ffb454);
+  transition:
+    transform var(--dur-fast) var(--ease-out-soft),
+    filter var(--dur-fast);
+  z-index: 1;
+}
+
+.tt-block:hover {
+  filter: brightness(1.16);
+}
+
+.tt-block:active {
+  transform: scale(0.98);
+}
+
+/* 正在上的那节：描一圈同色的边，扫一眼就知道「现在在这间教室」 */
+.tt-block.ongoing {
+  box-shadow:
+    0 0 0 1.5px var(--c, #ffb454),
+    0 6px 18px rgba(0, 0, 0, 0.28);
+}
+
+.tt-name {
+  font-size: calc(11.5px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tt-loc {
+  font-size: calc(9.5px * var(--font-scale, 1));
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tt-tm {
+  font-size: calc(9px * var(--font-scale, 1));
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  margin-top: auto;
+}
+
+/* 单双周角标：右上角一个小小的「单 / 双」 */
+.tt-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  font-size: calc(8.5px * var(--font-scale, 1));
+  line-height: 1;
+  padding: 2px 3px;
+  border-radius: 4px;
+  color: #1a1206;
+  background: rgba(255, 180, 84, 0.9);
+}
+
+.tt-badge.even {
+  background: rgba(90, 169, 240, 0.9);
+  color: #04121f;
+}
+
+/* 课程列表里的一行 */
+.tt-row {
+  width: 100%;
+  text-align: left;
+}
+
+.tt-swatch {
+  flex: 0 0 10px;
+  width: 10px;
+  height: 34px;
+  border-radius: 4px;
+}
+
+.tt-empty-hint {
+  font-size: calc(12px * var(--font-scale, 1));
+  margin-top: 4px;
+}
+
+/* 课程表单里的一个时段 */
+.tt-session-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 10px;
+  margin-bottom: 9px;
+  border-radius: 12px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line-soft);
+}
+
+/* 课表设置 */
+.tt-meta-hint {
+  font-size: calc(11.5px * var(--font-scale, 1));
+  line-height: 1.6;
+  margin: -2px 0 12px;
+}
+
+.tt-periods {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: 9px;
+}
+
+.tt-period-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tt-period-no {
+  flex: 0 0 22px;
+  text-align: center;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.tt-time {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 899px) {
+  .sched-head {
+    flex-wrap: wrap;
+    gap: 9px;
+  }
+
+  .tt-grid {
+    min-width: 470px;
+  }
+}
+
 .spin {
   animation: spin 900ms linear infinite;
 }
@@ -2245,41 +2685,72 @@ select.input {
 
 .assistant-fab {
   position: fixed;
-  right: 18px;
-  bottom: calc(78px + var(--safe-b));
   z-index: 28;
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 180, 84, 0.34);
-  background: var(--fab-bg);
+  /*
+   * 玻璃球，而不是「一个深色圆片」。
+   * 之前用的是 --fab-bg 那套深色渐变，在浅色主题下看着还是像一块黑胶布；
+   * 现在跟卡片/弹层共用同一组玻璃变量，只是把强调色揉进高光里，
+   * 让它在一堆玻璃里仍然认得出是「能点的那个」。
+   */
+  border: 1px solid rgba(255, 180, 84, 0.42);
+  background:
+    radial-gradient(120% 120% at 30% 18%, rgba(255, 213, 150, 0.34), transparent 58%),
+    linear-gradient(180deg, var(--glass-sheen) 0%, transparent 52%),
+    rgba(var(--glass-rgb), var(--glass-fill-alpha));
   color: var(--accent);
   display: grid;
   place-items: center;
   cursor: pointer;
+  /* 手指按上来时不要触发页面滚动，否则一拖就变成滚列表 */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 var(--glass-hi);
-  backdrop-filter: blur(18px) saturate(170%);
-  -webkit-backdrop-filter: blur(18px) saturate(170%);
-  transition: transform var(--dur-fast) var(--ease-out-soft), box-shadow var(--dur-fast) var(--ease-out-soft);
+    var(--glass-shadow),
+    inset 0 1px 0 var(--glass-hi),
+    inset 0 -1px 0 var(--glass-lo);
+  backdrop-filter: blur(var(--glass-blur-px)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-px)) saturate(var(--glass-saturate));
+  transition:
+    transform var(--dur-fast) var(--ease-out-soft),
+    box-shadow var(--dur-fast) var(--ease-out-soft),
+    opacity var(--dur-fast) var(--ease-out-soft);
 }
 
 .assistant-fab:hover {
   transform: translateY(-2px);
   box-shadow:
-    0 12px 28px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 var(--glass-hi);
+    0 14px 30px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--glass-hi),
+    inset 0 -1px 0 var(--glass-lo);
 }
 
 .assistant-fab:active {
   transform: scale(0.94);
 }
 
+/* 拖动中：跟手、不许有过渡（有过渡就会慢半拍，手感发飘） */
+.assistant-fab.dragging {
+  transition: none;
+  cursor: grabbing;
+  transform: scale(1.08);
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 var(--glass-hi);
+}
+
+/* 面板打开时按钮要淡出，不然会从玻璃面板底下透出来 */
+.assistant-fab.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.9);
+}
+
 @media (min-width: 900px) {
   .assistant-fab {
-    right: 30px;
-    bottom: 30px;
     width: 56px;
     height: 56px;
   }

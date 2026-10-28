@@ -161,23 +161,21 @@ export function Schedule() {
 
   return (
     <div className="schedule-page">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">{t('schedule.title')}</h1>
-          <div className="page-sub">{t('schedule.sub', { month: monthLabel, n: rangeOccs.length })}</div>
-        </div>
-        <div className="page-actions">
-          <button className="btn icon-btn" onClick={() => setSearching((v) => !v)} aria-label={t('schedule.search')}>
-            <Search size={17} />
-          </button>
-          <button className="btn icon-btn" onClick={() => setOcrOpen(true)} aria-label={t('schedule.ocrTitle')}>
-            <ImagePlus size={17} />
-          </button>
-          <button className="btn primary" onClick={() => setCreating(selected)}>
-            <Plus size={16} />
-            {t('schedule.newEvent')}
-          </button>
-        </div>
+      {/*
+        这一页的标题和「日程 / 课表」标签由外面的 ScheduleShell 画，
+        所以这里不再重复一个 page-head —— 只留一排操作按钮。
+      */}
+      <div className="sched-actions">
+        <button className="btn icon-btn" onClick={() => setSearching((v) => !v)} aria-label={t('schedule.search')}>
+          <Search size={17} />
+        </button>
+        <button className="btn icon-btn" onClick={() => setOcrOpen(true)} aria-label={t('schedule.ocrTitle')}>
+          <ImagePlus size={17} />
+        </button>
+        <button className="btn primary" onClick={() => setCreating(selected)}>
+          <Plus size={16} />
+          {t('schedule.newEvent')}
+        </button>
       </div>
 
       {searching ? (

@@ -1,5 +1,7 @@
 import type { EventItem, Occurrence } from '../domain/schedule';
 import { expandRange, reminderTimes, addDays } from '../domain/schedule';
+import type { Course, TimetableMeta } from '../domain/timetable';
+import { courseOccurrences } from '../domain/timetable';
 
 /**
  * 提醒。
@@ -183,6 +185,117 @@ const webTimers: number[] = [];
 export function clearWebTimers(): void {
   for (const id of webTimers) window.clearTimeout(id);
   webTimers.length = 0;
+}
+
+/* ---------------------------------------------------------------- 上课提醒 */
+
+/**
+ * 课表提醒提前多久。
+ *
+ * 固定 10 分钟、不做成每门课可调，是因为用户要的就是「别忘了上课」这一件事：
+ * 提前量在 5~15 分钟之间其实体感差不多，多做一层设置只会让人懒得填。
+ */
+export const COURSE_LEAD_MINUTES = 10;
+
+/**
+ * 把「第几节」换算成一个真实时刻。
+ *
+ * 注意这里必须自己拼日期再 new Date(y, m-1, d, hh, mm)：
+ * 用 new Date('2026-10-28 08:00') 在部分 WebView 里会得到 Invalid Date
+ * （那不是 ES5 规定的格式），iOS 上尤其容易踩。
+ */
+function atTime(dateKey: string, hhmm: string, minusMinutes = 0): Date | null {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const [hh, mm] = hhmm.split(':').map(Number);
+  if (![y, m, d, hh, mm].every((n) => Number.isFinite(n))) return null;
+  return new Date(y, m - 1, d, hh, mm - minusMinutes, 0, 0);
+}
+
+export interface CourseNotifyLabels {
+  /** 通知标题：课程名 */
+  title: (course: Course) => string;
+  /** 通知正文：默认「08:00 · A101」 */
+  body: (occ: { startTime: string; course: Course }) => string;
+}
+
+/**
+ * 排课表提醒。
+ *
+ * 和日程提醒分开排、分开清：日程的 rescheduleAll 每次都会把 pending 全清掉，
+ * 如果课表也塞进同一批，那么「编辑一条日程」会把所有课的提醒一起清空，
+ * 而课表页并不会因此重排 —— 结果就是课表提醒静悄悄地没了。
+ * 用不同的 id 前缀、各自清理自己的那部分，两边互不干扰。
+ */
+export async function rescheduleCourses(
+  courses: Course[],
+  meta: TimetableMeta,
+  windowDays = 21,
+  labels?: CourseNotifyLabels,
+): Promise<number> {
+  const support = notifySupport();
+  if (support === 'unsupported' || !courses.length) return 0;
+
+  const today = new Date();
+  const from = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+    today.getDate(),
+  ).padStart(2, '0')}`;
+  const to = addDays(from, windowDays);
+  const occs = courseOccurrences(courses, meta, from, to);
+  if (!occs.length) return 0;
+
+  const titleOf = labels?.title ?? ((c: Course) => c.name);
+  const bodyOf =
+    labels?.body ?? ((o: { startTime: string; course: Course }) => [o.startTime, o.course.location].filter(Boolean).join(' · '));
+
+  const now = Date.now();
+  const items: Array<{ id: number; title: string; body: string; schedule: { at: Date } }> = [];
+  for (const occ of occs) {
+    const at = atTime(occ.date, occ.startTime, COURSE_LEAD_MINUTES);
+    if (!at || at.getTime() <= now) continue;
+    items.push({
+      id: numericId(`course:${occ.key}`),
+      title: titleOf(occ.course),
+      body: bodyOf({ startTime: occ.startTime, course: occ.course }),
+      schedule: { at },
+    });
+  }
+  if (!items.length) return 0;
+
+  if (support === 'native') {
+    const plugin = await loadPlugin();
+    if (!plugin) return 0;
+    try {
+      // 只清「课」那部分：id 是我们自己哈希出来的，没法反查是不是课，
+      // 所以这里不做 cancel，改用「同样的 id 再 schedule 一次会覆盖」的语义
+      // （Capacitor 的 schedule 对同 id 是替换，不会堆两条）。
+      for (let i = 0; i < items.length; i += 50) {
+        await plugin.schedule({ notifications: items.slice(i, i + 50) });
+      }
+      return items.length;
+    } catch {
+      return 0;
+    }
+  }
+
+  // 网页 / Electron：页面开着时到点弹一条，只排未来 12 小时内的
+  const horizon = now + 12 * 3600 * 1000;
+  let count = 0;
+  for (const item of items) {
+    if (item.schedule.at.getTime() > horizon) continue;
+    const delay = item.schedule.at.getTime() - now;
+    const timer = window.setTimeout(() => {
+      try {
+        if (notifySupport() === 'web' && Notification.permission === 'granted') {
+          new Notification(item.title, { body: item.body, tag: `course-${item.id}` });
+        }
+      } catch {
+        // 通知失败不影响主流程
+      }
+    }, delay);
+    webTimers.push(timer);
+    count += 1;
+  }
+  return count;
 }
 
 /** 单条日程的下一次提醒时刻（列表里显示「明天 09:00 提醒」用） */
