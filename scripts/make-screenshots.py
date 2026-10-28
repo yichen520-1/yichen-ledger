@@ -31,7 +31,7 @@ PHONES = [
     ("m-schedule-month.png", "日程"),
     ("assistant-chat.png", "忆小尘"),
 ]
-DESKTOP = ("d-01-home.png", "桌面版")
+DESKTOP = ("d-assistant-chat.png", "桌面版")
 
 PANEL_W = 232          # 每张手机图缩放后的宽度
 DESKTOP_W = 1220       # 桌面图缩放后的宽度
