@@ -29,6 +29,8 @@ import { db } from '../db';
 export type RegionKey = 'sidebar' | 'main' | 'tabbar';
 export type FitMode = 'cover' | 'contain' | 'fill' | 'center';
 export type FontStyle = 'system' | 'serif' | 'kai' | 'rounded';
+/** 深浅主题：system 跟随系统 */
+export type ThemeMode = 'system' | 'dark' | 'light';
 
 export const REGIONS: RegionKey[] = ['sidebar', 'main', 'tabbar'];
 
@@ -67,10 +69,10 @@ export interface Appearance {
   accentColor: string | null;
   /** 圆角 px */
   radius: number;
-  /** 面板不透明度 %，100 = 完全不透明 */
-  glassAlpha: number;
-  /** 面板背景雾化 px */
-  glassBlur: number;
+  /** 玻璃强度 %：0 = 实底（关闭玻璃），100 = 出厂的水晶感，150 = 更透 */
+  glass: number;
+  /** 深浅主题 */
+  theme: ThemeMode;
   regions: Record<RegionKey, RegionStyle>;
 }
 
@@ -94,9 +96,9 @@ export const DEFAULT_APPEARANCE: Appearance = {
   fontScale: 100,
   textColor: null,
   accentColor: null,
-  radius: 14,
-  glassAlpha: 100,
-  glassBlur: 0,
+  radius: 20,
+  glass: 100,
+  theme: 'system',
   regions: {
     sidebar: { ...DEFAULT_REGION },
     main: { ...DEFAULT_REGION },
@@ -124,20 +126,42 @@ function clamp(n: number, min: number, max: number): number {
 /** 合并用户存的旧数据与默认值，避免升级后字段缺失导致 NaN */
 function normalize(raw: unknown): Appearance {
   if (!raw || typeof raw !== 'object') return DEFAULT_APPEARANCE;
-  const src = raw as Partial<Appearance>;
+  const src = raw as Partial<Appearance> & { glassAlpha?: number; glassBlur?: number };
   const regions = {} as Record<RegionKey, RegionStyle>;
   for (const key of REGIONS) {
     const incoming = (src.regions?.[key] ?? {}) as Partial<RegionStyle>;
     regions[key] = { ...DEFAULT_REGION, ...incoming };
   }
+
+  /*
+   * 老版本（v0.2~v0.5）存的是 glassAlpha(40~100) + glassBlur(0~40)，
+   * 而且默认是 glassAlpha=100 也就是「玻璃关着」。新版换成单一的 glass 强度。
+   * 迁移规则：老用户如果确实开过玻璃（alpha<100），按「越透明 → 强度越高」折算；
+   * 没开过（=100）就给新版默认值 100，让他们也能看到新质感。
+   */
+  let glass: number;
+  if (typeof src.glass === 'number') {
+    glass = src.glass;
+  } else if (typeof src.glassAlpha === 'number' && src.glassAlpha < 100) {
+    // alpha 40 → 强度 140，alpha 100 → 强度 100
+    glass = 100 + Math.round((100 - src.glassAlpha) * (40 / 60));
+  } else {
+    glass = DEFAULT_APPEARANCE.glass;
+  }
+
+  const theme: ThemeMode =
+    src.theme === 'dark' || src.theme === 'light' || src.theme === 'system'
+      ? src.theme
+      : DEFAULT_APPEARANCE.theme;
+
   return {
     fontStyle: src.fontStyle ?? DEFAULT_APPEARANCE.fontStyle,
     fontScale: clamp(Number(src.fontScale ?? 100) || 100, 100, 140),
     textColor: src.textColor ?? null,
     accentColor: src.accentColor ?? null,
-    radius: clamp(Number(src.radius ?? 14) || 0, 0, 26),
-    glassAlpha: clamp(Number(src.glassAlpha ?? 100) || 100, 40, 100),
-    glassBlur: clamp(Number(src.glassBlur ?? 0) || 0, 0, 40),
+    radius: clamp(Number(src.radius ?? 20) || 0, 0, 26),
+    glass: clamp(Number(glass) || 0, 0, 150),
+    theme,
     regions,
   };
 }
@@ -301,7 +325,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--font-stack', FONT_STACKS[appearance.fontStyle]);
     root.style.setProperty('--font-scale', String(appearance.fontScale / 100));
     root.style.setProperty('--radius', `${appearance.radius}px`);
-    root.style.setProperty('--radius-sm', `${Math.max(4, appearance.radius - 4)}px`);
+    root.style.setProperty('--radius-sm', `${Math.max(4, appearance.radius - 6)}px`);
     if (appearance.accentColor) {
       root.style.setProperty('--accent', appearance.accentColor);
       root.style.setProperty('--accent-soft', `${appearance.accentColor}24`);
@@ -314,18 +338,58 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     } else {
       root.style.removeProperty('--text');
     }
-    // 面板半透明：玻璃不透明度低于 100 时才把卡片背景调透
-    if (appearance.glassAlpha < 100) {
-      root.style.setProperty('--glass-alpha', String(appearance.glassAlpha / 100));
-      root.style.setProperty('--glass-blur', `${appearance.glassBlur}px`);
-      root.setAttribute('data-glass', 'on');
-    } else {
-      root.style.removeProperty('--glass-alpha');
-      root.style.removeProperty('--glass-blur');
-      root.removeAttribute('data-glass');
-    }
     root.setAttribute('data-font', appearance.fontStyle);
   }, [appearance]);
+
+  /*
+   * 玻璃强度
+   * ------------------------------------------------------------------
+   * 一个 0~150 的滑块，映射到 CSS 变量：
+   *   --glass-k       强度系数 0~1.5，填充不透明度在 CSS 里用 calc() 由它算
+   *   --glass-blur-px 模糊半径 —— 封顶 26px，再高移动端开始掉帧
+   *   --glass-saturate 饱和度  —— iOS 的玻璃会让背后的颜色更艳
+   *
+   * 0 表示关掉玻璃：一个 backdrop-filter 都不留，直接实底。
+   * 不透明度不在这里算 —— 深浅两套的公式方向相反（深色越透越好看、
+   * 浅色越透越糊），写在 CSS 里各用各的 calc()，JS 只给强度。
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    const k = clamp(appearance.glass, 0, 150) / 100;
+    if (k <= 0) {
+      root.setAttribute('data-glass', 'off');
+      root.style.setProperty('--glass-k', '0');
+      root.style.setProperty('--glass-blur-px', '0px');
+      root.style.setProperty('--glass-saturate', '100%');
+      return;
+    }
+    root.setAttribute('data-glass', 'on');
+    root.style.setProperty('--glass-k', String(k));
+    root.style.setProperty('--glass-blur-px', `${Math.round(clamp(26 * k, 8, 26))}px`);
+    root.style.setProperty('--glass-saturate', `${Math.round(clamp(175 * k, 110, 200))}%`);
+  }, [appearance.glass]);
+
+  /*
+   * 深浅主题
+   * ------------------------------------------------------------------
+   * 'system' 跟着系统走，但用户手动选了就必须压过系统 —— 所以监听
+   * matchMedia 只在 system 模式下挂。写 data-theme 而不是 data-theme="dark"，
+   * 是因为 :root 的默认值就是深色，少一次属性变更。
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const apply = () => {
+      const wantLight =
+        appearance.theme === 'light' || (appearance.theme === 'system' && mq.matches);
+      if (wantLight) root.setAttribute('data-theme', 'light');
+      else root.removeAttribute('data-theme');
+    };
+    apply();
+    if (appearance.theme !== 'system') return;
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, [appearance.theme]);
 
   const value = useMemo<AppearanceState>(
     () => ({
@@ -347,4 +411,13 @@ export function useAppearance(): AppearanceState {
   const ctx = useContext(AppearanceCtx);
   if (!ctx) throw new Error('useAppearance 必须在 <AppearanceProvider> 内使用');
   return ctx;
+}
+
+/**
+ * 是否有任何区域设了自定义壁纸。
+ * 用来决定环境底要不要收起来 —— 壁纸已经铺满时再垫一层渐变，
+ * 会在壁纸半透明的地方混出一层不该有的颜色。
+ */
+export function hasCustomBackdrop(appearance: Appearance): boolean {
+  return REGIONS.some((key) => Boolean(appearance.regions[key].image));
 }

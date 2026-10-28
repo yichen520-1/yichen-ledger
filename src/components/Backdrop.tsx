@@ -1,4 +1,25 @@
-import { backdropStyle, useAppearance, type RegionKey } from '../state/AppearanceContext';
+import {
+  backdropStyle,
+  hasCustomBackdrop,
+  useAppearance,
+  type RegionKey,
+} from '../state/AppearanceContext';
+
+/**
+ * 环境底
+ * ------------------------------------------------------------------
+ * 玻璃要有东西可透，否则「毛玻璃」透出来的还是同一块黑，看起来就是灰板。
+ * 这层水墨渐变铺在最底下（position: fixed，不参与滚动），
+ * 玻璃面板盖上去才有颜色可折射。
+ *
+ * 用户给任意一个区域设了自定义壁纸时把它收起来：壁纸本身已经提供了色彩，
+ * 再垫一层渐变会在半透明的壁纸边缘混出脏色。
+ */
+export function Ambient() {
+  const { appearance } = useAppearance();
+  const hidden = hasCustomBackdrop(appearance);
+  return <div className={`ambient${hidden ? ' is-hidden' : ''}`} aria-hidden="true" />;
+}
 
 /**
  * 区域背景层

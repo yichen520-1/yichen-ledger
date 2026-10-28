@@ -19,6 +19,7 @@ import {
   type FitMode,
   type FontStyle,
   type RegionKey,
+  type ThemeMode,
 } from '../state/AppearanceContext';
 import { exportBackup, exportCsvText, importBackup, importCsvText } from '../db/repository';
 import { db } from '../db';
@@ -114,6 +115,13 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
   const [region, setRegion] = useState<RegionKey>('main');
   const [startup, setStartup] = useState<Startup>('dashboard');
+
+  // 深浅主题的三个选项。标签走 t()，所以放在组件里算。
+  const THEMES: Array<[ThemeMode, string]> = [
+    ['system', t('settings.themeSystem')],
+    ['dark', t('settings.themeDark')],
+    ['light', t('settings.themeLight')],
+  ];
 
   // AI 设置：读一次填进表单，改完点保存才写库
   const { config, save: saveAiConfig } = useAiConfig();
@@ -350,22 +358,37 @@ export default function SettingsPage() {
           unit="px"
           onChange={(n) => patch({ radius: n })}
         />
+      </section>
+
+      {/* ---------- 水晶玻璃 ---------- */}
+      <div className="section-title">{t('settings.groupGlass')}</div>
+
+      <section className="card" style={{ padding: '4px 16px' }}>
+        <Row name={t('settings.theme')} hint={t('settings.themeHint')}>
+          <div className="segmented theme-seg">
+            {THEMES.map(([value, label]) => (
+              <button
+                key={value}
+                className={appearance.theme === value ? 'on' : ''}
+                onClick={() => patch({ theme: value })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Row>
         <Slider
-          label={t('settings.glassAlpha')}
-          value={appearance.glassAlpha}
-          min={40}
-          max={100}
-          unit="%"
-          onChange={(n) => patch({ glassAlpha: n })}
-        />
-        <Slider
-          label={t('settings.glassBlur')}
-          value={appearance.glassBlur}
+          label={t('settings.glass')}
+          value={appearance.glass}
           min={0}
-          max={40}
-          unit="px"
-          onChange={(n) => patch({ glassBlur: n })}
+          max={150}
+          step={5}
+          unit="%"
+          onChange={(n) => patch({ glass: n })}
         />
+        <div className="set-hint" style={{ paddingBottom: 12 }}>
+          {t('settings.glassHint')}
+        </div>
       </section>
 
       {/* 三个区域各自一张壁纸 */}

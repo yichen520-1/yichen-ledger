@@ -14,7 +14,7 @@ import { AppearanceProvider } from './state/AppearanceContext';
 import { ModeProvider, useMode, type AppMode } from './state/ModeContext';
 import { I18nProvider, useI18n, type DictKey } from './i18n';
 import { ToastProvider } from './components/Toast';
-import { Backdrop } from './components/Backdrop';
+import { Backdrop, Ambient } from './components/Backdrop';
 import { AssistantProvider } from './state/AssistantContext';
 import { AssistantHost, useAssistantUi } from './components/AssistantHost';
 import { AssistantFab } from './components/AssistantPanel';
@@ -119,6 +119,7 @@ function Shell() {
 
   return (
     <div className={`shell${isSchedule ? ' mode-schedule' : ''}`}>
+      <Ambient />
       <aside className="sidebar has-backdrop">
         <Backdrop region="sidebar" />
         <div className="sidebar-inner">

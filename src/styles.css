@@ -1,21 +1,88 @@
+/* ==================================================================
+   主题变量
+   ------------------------------------------------------------------
+   两套：深色（默认）与浅色。浅色由 <html data-theme="light"> 打开，
+   由 AppearanceContext 根据「跟随系统 / 强制深 / 强制浅」写上去。
+
+   命名分两类：
+     --bg* / --line* / --text*  基础色板
+     --glass-*                  水晶玻璃那一层（半透色、边缘高光、模糊、饱和度）
+   ================================================================== */
+
 :root {
   color-scheme: dark;
+
   --bg: #0f1216;
-  --bg-elev: #161b22;
-  --bg-elev-2: #1d242d;
-  --line: #262d38;
-  --line-soft: #1e242c;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-soft: rgba(255, 255, 255, 0.06);
   --text: #e8edf4;
-  --text-dim: #97a3b4;
-  --text-faint: #6b7789;
+  --text-dim: #aab6c6;
+  --text-faint: #94a0b1;
   --accent: #ffb454;
   --accent-soft: rgba(255, 180, 84, 0.14);
   --green: #4cc38a;
   --red: #f2645a;
   --blue: #5aa9f0;
-  --radius: 14px;
-  --radius-sm: 10px;
+  --radius: 20px;
+  --radius-sm: 14px;
+
+  /*
+   * 玻璃面板的「填充色」。--bg-elev 给控件（按钮、输入框、胶囊），
+   * --bg-elev-2 给更弱一级的底（轨道、图标底、聊天气泡）。
+   *
+   * 深色下玻璃是「一层薄薄的白纱」而不是「一层深色板」：
+   * iOS 的深色液态玻璃靠的就是让背后的颜色透上来，白色只用来提亮和定形。
+   * 所以这里用纯白 + 很低的 alpha，由 AppearanceContext 按强度重算。
+   */
+  --bg-elev: rgba(255, 255, 255, 0.085);
+  --bg-elev-2: rgba(255, 255, 255, 0.05);
+
+  /* 玻璃面板本体 */
+  --glass-rgb: 255, 255, 255;
+  /*
+   * 填充不透明度由「强度」算出来（--glass-k 由 JS 写 0~1.5）：
+   *   k=0 → 0.16（接近实心），k=1 → 0.075（出厂），k=1.5 → 0.04（最透）。
+   * 深色下玻璃是「一层薄白纱」而不是「一层灰板」：白只用来定形和提亮，
+   * 真正让它好看的是背后那几团暖冷光透过模糊后的颜色差。
+   */
+  --glass-k: 1;
+  --glass-fill-alpha: calc(0.16 - 0.085 * var(--glass-k));
+  --glass-blur-px: 24px;
+  --glass-saturate: 175%;
+  --glass-sheen: rgba(255, 255, 255, 0.12);
+  --glass-sheen-2: rgba(255, 255, 255, 0.03);
+  --glass-edge: rgba(255, 255, 255, 0.16);
+  --glass-edge-soft: rgba(255, 255, 255, 0.09);
+  --glass-hi: rgba(255, 255, 255, 0.2);
+  --glass-lo: rgba(255, 255, 255, 0.04);
+  --glass-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+
+  /* 遮罩、提示条、气泡这些散落的颜色，浅色下要整体换掉 */
+  --scrim: rgba(0, 0, 0, 0.58);
+  --toast-bg: rgba(38, 45, 56, 0.96);
+  --fab-bg: linear-gradient(160deg, #2a2013, #1a1f27 70%);
+  --warn-text: #ffd9a8;
+  --warn-title: #ffe0b6;
+  --warn-body: #e5c9a4;
+  --info-title: #cfe6ff;
+  --info-body: #b9cee2;
+  --alert-text: #ffb4ad;
+  --bubble-user-text: #ffdfae;
+  --scrollbar-hover: #333c49;
+
+  /*
+   * 环境底：三层光斑 + 一层深底。
+   * 左上暖（琥珀，呼应「忆尘」的旧纸与灯）、右上冷（蓝，呼应夜）、
+   * 左下青（一点点生气），中间压深。颜色不能太怯 —— 玻璃背后要是没有
+   * 颜色差，模糊出来还是同一块灰，等于白做。
+   */
+  --ambient: radial-gradient(1200px 820px at 6% -14%, rgba(255, 170, 72, 0.26), transparent 60%),
+    radial-gradient(1000px 760px at 96% -6%, rgba(78, 148, 255, 0.24), transparent 58%),
+    radial-gradient(900px 700px at -6% 92%, rgba(64, 196, 156, 0.17), transparent 60%),
+    radial-gradient(1100px 800px at 88% 104%, rgba(150, 96, 255, 0.14), transparent 62%),
+    linear-gradient(168deg, #1a212c 0%, #101520 44%, #090c11 100%);
+
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
 
@@ -23,8 +90,6 @@
   --font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei',
     'Hiragino Sans GB', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-scale: 1;
-  --glass-alpha: 1;
-  --glass-blur: 0px;
 
   /* iOS 那种「先慢后快再收住」的曲线，全站动画共用 */
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
@@ -32,6 +97,63 @@
   --dur-fast: 180ms;
   --dur-base: 320ms;
   --dur-slow: 460ms;
+}
+
+/*
+ * 浅色主题
+ * ------------------------------------------------------------------
+ * 不是把深色反过来那么简单：玻璃在浅色下是「白上加白」，
+ * 靠的是边框和投影把面板从背景里「托」起来，所以边缘改用暗色描边，
+ * 高光也压到几乎看不见，否则会糊成一片。
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #eef1f6;
+  --line: rgba(20, 28, 42, 0.12);
+  --line-soft: rgba(20, 28, 42, 0.08);
+  --text: #14181f;
+  --text-dim: #46505f;
+  --text-faint: #5c6879;
+  --accent: #c9761a;
+  --accent-soft: rgba(201, 118, 26, 0.13);
+  --green: #17805a;
+  --red: #c3392d;
+  --blue: #2565b8;
+
+  --bg-elev: rgba(255, 255, 255, 0.78);
+  --bg-elev-2: rgba(255, 255, 255, 0.55);
+
+  --glass-rgb: 255, 255, 255;
+  /* 浅色下是「白上加白」，填充要更实才托得住，所以公式和深色相反 */
+  --glass-fill-alpha: calc(0.9 - 0.2 * var(--glass-k));
+  --glass-saturate: 150%;
+  --glass-sheen: rgba(255, 255, 255, 0.72);
+  --glass-sheen-2: rgba(255, 255, 255, 0.3);
+  --glass-edge: rgba(20, 28, 42, 0.1);
+  --glass-edge-soft: rgba(20, 28, 42, 0.07);
+  --glass-hi: rgba(255, 255, 255, 0.95);
+  --glass-lo: rgba(20, 28, 42, 0.04);
+  --glass-shadow: 0 16px 40px rgba(28, 42, 66, 0.12);
+  --shadow: 0 10px 28px rgba(28, 42, 66, 0.14);
+
+  --scrim: rgba(18, 24, 34, 0.3);
+  --toast-bg: rgba(255, 255, 255, 0.9);
+  --fab-bg: linear-gradient(160deg, #fff3e0, #f5f8fc 70%);
+  --warn-text: #7a4a12;
+  --warn-title: #8a5410;
+  --warn-body: #6b5230;
+  --info-title: #1d4f86;
+  --info-body: #2f5578;
+  --alert-text: #a12a20;
+  --bubble-user-text: #6a4413;
+  --scrollbar-hover: #c3cad6;
+
+  --ambient: radial-gradient(1200px 820px at 6% -14%, rgba(255, 176, 86, 0.34), transparent 60%),
+    radial-gradient(1000px 760px at 96% -6%, rgba(88, 152, 255, 0.3), transparent 58%),
+    radial-gradient(900px 700px at -6% 92%, rgba(70, 200, 160, 0.22), transparent 60%),
+    radial-gradient(1100px 800px at 88% 104%, rgba(160, 108, 255, 0.18), transparent 62%),
+    linear-gradient(168deg, #f8f9fc 0%, #eef1f6 46%, #e4e9f1 100%);
 }
 
 * {
@@ -61,7 +183,7 @@
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #333c49;
+  background: var(--scrollbar-hover);
 }
 
 html,
@@ -78,6 +200,97 @@ body {
   font-size: calc(15px * var(--font-scale, 1));
   line-height: 1.5;
   overscroll-behavior-y: none;
+}
+
+/*
+ * 环境底
+ * ------------------------------------------------------------------
+ * 玻璃要「有东西可透」。纯色底上做毛玻璃，透出来的还是同一个颜色，
+ * 看起来就是一块灰板 —— 这是 v0.2 那版玻璃质感不好看的根本原因。
+ *
+ * 所以铺一层固定的水墨渐变：焦墨打底，左上一点暖（琥珀），右上一点冷（蓝），
+ * 右下一点青。它不动、不随滚动重绘（position: fixed 会单独成层），
+ * 因此对滚动帧率没有影响。
+ *
+ * 用户设了自定义壁纸时，壁纸由各区域的 <Backdrop> 画在上面，这一层就只当兜底。
+ */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--ambient);
+}
+
+/* 壁纸盖上来之后，环境底就不需要了：留着反而会在壁纸边上露一圈 */
+.ambient.is-hidden {
+  opacity: 0;
+}
+
+/* ==================================================================
+   水晶玻璃材质
+   ------------------------------------------------------------------
+   iOS 26 那种「液态玻璃」在视觉上其实只有四件事：
+     1. 半透明 + 模糊 + 提饱和 —— 让背后的颜色透上来并且更鲜艳；
+     2. 顶部一道内高光 —— 模拟光从上方打在玻璃厚度上；
+     3. 一圈极细的亮边 —— 玻璃的切边；
+     4. 一层柔和的投影 —— 把它从背景里托起来。
+   四件事都用 background + box-shadow 实现，不额外加伪元素或图层，
+   元素数量不会变多，滚动时也就没有额外的合成开销。
+
+   性能取舍：
+     - 只有「面板级」元素（卡片、弹层、侧边栏、导航条、对话框）加模糊，
+       列表里的每一行不加 —— 一屏几十行各来一层 backdrop-filter 必掉帧；
+     - 模糊半径封顶 26px，再大在移动端就要开始吃帧率了；
+     - 不支持 backdrop-filter 的浏览器（老 WebView）走 @supports 兜底成实底，
+       不会出现「透出黑糊糊一片但字看不清」。
+   ================================================================== */
+
+.glass-surface,
+.card,
+.sheet,
+.assistant-panel,
+.sidebar,
+.tabbar {
+  background:
+    linear-gradient(180deg, var(--glass-sheen) 0%, transparent 46%),
+    rgba(var(--glass-rgb), var(--glass-fill-alpha));
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px 0 var(--glass-hi),
+    inset 0 -1px 0 var(--glass-lo);
+  backdrop-filter: blur(var(--glass-blur-px)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-px)) saturate(var(--glass-saturate));
+}
+
+/* 老浏览器没有 backdrop-filter：退回不透明底，保证可读性优先 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-surface,
+  .card,
+  .sheet,
+  .assistant-panel,
+  .sidebar,
+  .tabbar {
+    background: rgba(var(--glass-rgb), 0.96);
+  }
+}
+
+/*
+ * 用户开了「减少透明度」辅助功能时，玻璃要退回实底。
+ * 这不是可选项 —— 有些人对低对比度的半透明面板是读不清的。
+ */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-surface,
+  .card,
+  .sheet,
+  .assistant-panel,
+  .sidebar,
+  .tabbar {
+    background: rgba(var(--glass-rgb), 0.97);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 button {
@@ -106,8 +319,7 @@ textarea {
   display: none;
   width: 232px;
   flex: 0 0 232px;
-  border-right: 1px solid var(--line);
-  background: var(--bg-elev);
+  border-right: 1px solid var(--glass-edge);
   padding: 20px 14px;
   position: sticky;
   top: 0;
@@ -166,15 +378,6 @@ textarea {
 .backdrop-dim {
   position: absolute;
   inset: 0;
-}
-
-/* 玻璃质感：只有开了才让卡片半透明 */
-[data-glass='on'] .card,
-[data-glass='on'] .overview,
-[data-glass='on'] .sheet {
-  background: rgba(22, 27, 34, var(--glass-alpha, 1));
-  backdrop-filter: blur(var(--glass-blur, 0px));
-  -webkit-backdrop-filter: blur(var(--glass-blur, 0px));
 }
 
 .brand {
@@ -291,17 +494,17 @@ textarea {
   margin-top: 2px;
 }
 
-/* 底部 tab（移动端） */
+/* 底部 tab（移动端）：浮起来的一条玻璃，不贴死屏幕底边 */
 .tabbar {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  border-top: 1px solid var(--line);
-  background: rgba(18, 22, 28, 0.94);
-  backdrop-filter: blur(14px);
   padding-bottom: var(--safe-b);
   z-index: 30;
+  /* 圆角只留上面两个，下面贴着屏幕边 */
+  border-radius: 22px 22px 0 0;
+  border-bottom: none;
 }
 
 .tabbar-inner {
@@ -347,8 +550,6 @@ textarea {
 /* ---------------- 卡片 ---------------- */
 
 .card {
-  background: var(--bg-elev);
-  border: 1px solid var(--line-soft);
   border-radius: var(--radius);
   padding: 16px;
 }
@@ -374,10 +575,19 @@ textarea {
   font-weight: 400;
 }
 
-/* 总览卡 */
+/* 总览卡：比普通卡片更「厚」一点，顶部的光带也更明显，像一块压在最上面的玻璃 */
 .overview {
-  background: linear-gradient(150deg, #232c38 0%, #171d25 60%);
-  border: 1px solid #2b3340;
+  background:
+    linear-gradient(180deg, var(--glass-sheen) 0%, transparent 42%),
+    radial-gradient(120% 140% at 0% 0%, rgba(255, 180, 84, 0.16), transparent 58%),
+    rgba(var(--glass-rgb), calc(var(--glass-fill-alpha) + 0.08));
+}
+
+.overview .split {
+  display: flex;
+  gap: 12px;
+  border-top: 1px solid var(--glass-edge-soft);
+  padding-top: 12px;
 }
 
 .overview .networth-label {
@@ -559,6 +769,23 @@ textarea {
 
 .segmented button.on[data-type='transfer'] {
   color: var(--blue);
+}
+
+/*
+ * 主题三选一
+ * ------------------------------------------------------------------
+ * .segmented 的按钮是 flex:1，窄的时候「跟随系统」四个字会被压成两行，
+ * 高度一撑就把整行 Row 顶歪。这里改成按内容定宽、不换行 ——
+ * 三个选项都是短词，横向排得下。
+ */
+.theme-seg {
+  flex: none;
+}
+
+.theme-seg button {
+  flex: none;
+  padding: 8px 14px;
+  white-space: nowrap;
 }
 
 .amount-display {
@@ -1110,7 +1337,7 @@ textarea {
 .banner-warn {
   border-color: rgba(255, 180, 84, 0.34);
   background: linear-gradient(150deg, rgba(255, 180, 84, 0.13), rgba(255, 180, 84, 0.05));
-  color: #ffd9a8;
+  color: var(--warn-text);
 }
 
 .banner-warn svg {
@@ -1120,20 +1347,20 @@ textarea {
 .banner-title {
   font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
-  color: #ffe0b6;
+  color: var(--warn-title);
   margin-bottom: 4px;
 }
 
 .banner-body {
   font-size: calc(12.5px * var(--font-scale, 1));
   line-height: 1.62;
-  color: #e5c9a4;
+  color: var(--warn-body);
 }
 
 .alert {
   background: rgba(242, 100, 90, 0.12);
   border: 1px solid rgba(242, 100, 90, 0.35);
-  color: #ffb4ad;
+  color: var(--alert-text);
   padding: 10px 12px;
   border-radius: 10px;
   font-size: calc(13px * var(--font-scale, 1));
@@ -1145,14 +1372,18 @@ textarea {
   left: 50%;
   bottom: calc(96px + var(--safe-b));
   transform: translateX(-50%);
-  background: rgba(38, 45, 56, 0.96);
-  border: 1px solid var(--line);
+  background: var(--toast-bg);
+  border: 1px solid var(--glass-edge);
   color: var(--text);
   padding: 10px 18px;
   border-radius: 999px;
   font-size: calc(13px * var(--font-scale, 1));
   z-index: 60;
-  box-shadow: var(--shadow);
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 var(--glass-hi);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   /* 动画统一放在文件末尾的「动画」一节里，避免两处声明打架 */
 }
 
@@ -1167,7 +1398,9 @@ textarea {
 .sheet-mask {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--scrim);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   z-index: 50;
   display: flex;
   align-items: flex-end;
@@ -1175,9 +1408,7 @@ textarea {
 }
 
 .sheet {
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
-  border-radius: 18px 18px 0 0;
+  border-radius: 26px 26px 0 0;
   width: 100%;
   max-width: 520px;
   padding: 18px 18px calc(18px + var(--safe-b));
@@ -1390,7 +1621,11 @@ textarea {
 .mode-switch-track {
   display: flex;
   gap: 4px;
-  background: var(--bg);
+  /*
+   * 这里原来用 var(--bg)（不透明的 #0f1216），在玻璃卡片里就是一块「黑框」——
+   * 用户截图里指的就是这种。改成半透明白纱，跟整站的玻璃同一套语言。
+   */
+  background: var(--bg-elev-2);
   border-radius: 9px;
   padding: 3px;
 }
@@ -1734,7 +1969,8 @@ select.input {
 .sched-row.done .sched-check {
   background: var(--green);
   border-color: var(--green);
-  color: #0f1216;
+  /* 勾要用「反色」：深色主题下是深底上的绿勾，浅色下也一样，所以取 --bg 的反面 */
+  color: #fff;
 }
 
 .sched-row.done .tx-title {
@@ -1857,11 +2093,11 @@ select.input {
 }
 
 .banner-info .banner-title {
-  color: #cfe6ff;
+  color: var(--info-title);
 }
 
 .banner-info .banner-body {
-  color: #b9cee2;
+  color: var(--info-body);
 }
 
 /* 图片识别 */
@@ -2003,18 +2239,24 @@ select.input {
   height: 52px;
   border-radius: 50%;
   border: 1px solid rgba(255, 180, 84, 0.34);
-  background: linear-gradient(160deg, #2a2013, #1a1f27 70%);
+  background: var(--fab-bg);
   color: var(--accent);
   display: grid;
   place-items: center;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 var(--glass-hi);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
   transition: transform var(--dur-fast) var(--ease-out-soft), box-shadow var(--dur-fast) var(--ease-out-soft);
 }
 
 .assistant-fab:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 var(--glass-hi);
 }
 
 .assistant-fab:active {
@@ -2036,7 +2278,9 @@ select.input {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--scrim);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -2048,9 +2292,7 @@ select.input {
   height: min(78vh, 640px);
   display: flex;
   flex-direction: column;
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
-  border-radius: 20px 20px 0 0;
+  border-radius: 26px 26px 0 0;
   padding-bottom: var(--safe-b);
   animation: sheet-spring var(--dur-slow) var(--ease-ios) both;
   overflow: hidden;
@@ -2069,8 +2311,10 @@ select.input {
     pointer-events: auto;
     max-width: 420px;
     height: min(72vh, 620px);
-    border-radius: 18px;
-    box-shadow: var(--shadow);
+    border-radius: 22px;
+    box-shadow:
+      var(--glass-shadow),
+      inset 0 1px 0 var(--glass-hi);
     animation: assistant-in var(--dur-base) var(--ease-ios) both;
   }
 }
@@ -2199,7 +2443,7 @@ select.input {
   background: var(--accent-soft);
   border: 1px solid rgba(255, 180, 84, 0.28);
   border-bottom-right-radius: 5px;
-  color: #ffdfae;
+  color: var(--bubble-user-text);
 }
 
 .assistant-text {
@@ -2356,8 +2600,12 @@ select.input {
   max-height: 120px;
   padding: 9px 12px;
   border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--bg);
+  border: 1px solid var(--glass-edge-soft);
+  /*
+   * 这里原来是 var(--bg)（不透明底），在玻璃面板里就是一块「黑框」。
+   * 换成玻璃的填充色，让输入框也属于同一块材质，只是比面板再浅一档。
+   */
+  background: var(--bg-elev-2);
   color: var(--text);
   font: inherit;
   font-size: calc(13px * var(--font-scale, 1));
