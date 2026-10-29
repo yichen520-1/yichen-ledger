@@ -230,7 +230,7 @@ node_modules/electron/dist/electron.exe --no-sandbox --user-data-dir=.shots/edat
 
 `scripts/schedule-check.mjs` 的课表部分会：断言网格格子数正好是「节次 × 7」、七个星期表头齐全、窄屏下卡片不横向溢出（`overflow` 生效且可以横滚）、第几周显示正确、加一门课之后刷新页面课程还在。
 
-另外三个**只出图不断言**的脚本：`node scripts/assistant-shot.mjs` 出忆小尘的对话面板，`node scripts/timetable-shot.mjs` 出课表在手机与桌面两种宽度下的样子（含课表设置面板和加课面板），`node scripts/sidebar-shot.mjs` 出侧边栏改版后的样子（桌面两块竖排、手机底部导航、课表页），都存到 `.shots/`。`scripts/make-screenshots.py` 再把 `.shots/` 里的图拼成 `docs/screenshots/preview.png`。
+另外四个**只出图不断言**的脚本：`node scripts/assistant-shot.mjs` 出忆小尘的对话面板，`node scripts/timetable-shot.mjs` 出课表在手机与桌面两种宽度下的样子（含课表设置面板和加课面板），`node scripts/sidebar-shot.mjs` 出侧边栏改版后的样子（桌面两块竖排、手机底部导航、课表页），`node scripts/schedule-shot.mjs` 出日程月视图（手机与桌面两种宽度），都存到 `.shots/`。`scripts/make-screenshots.py` 再把 `.shots/` 里的图拼成 `docs/screenshots/preview.png`。
 
 `scripts/appearance-check.mjs` 专门盯 v0.2.0 的新东西：设置页四组齐全 → 本地存储横幅在 → 语言下拉切到英文后导航文字和
 `<html lang>` 一起变 → 字号基准调到 120% 后实际字号变大 → 用 canvas 现场生成一张图当壁纸上传 →
