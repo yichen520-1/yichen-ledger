@@ -1,19 +1,20 @@
-# 忆笺记账 · Yijian Ledger
+# 忆笺 · Yijian
 
-一个**本地优先**的个人记账应用：一套代码，同时运行在 **Android / iOS / Windows / macOS** 上。
-数据全部保存在你自己的设备里（IndexedDB），不经过任何服务器。
+**忆笺**是一个本地优先的小工具：记账、日程、课表、还有一个叫忆小尘的助手，都在这一张纸上。
+一套代码，同时运行在 **Android / iOS / Windows / macOS** 上；数据全部保存在你自己的设备里（IndexedDB），不经过任何服务器。
 
-> 当前版本 `v0.7.2`：**改名了。** 软件从「忆尘」改叫「忆笺」—— 记账和日程都记在同一张纸上，
-> 所以叫「笺」。原来叫「忆尘记账 / 忆尘日程」的，现在是「忆笺记账 / 忆笺日程」；
-> 助手「忆小尘」的名字没动。程序名、应用标识、数据目录一律没变，升级不会丢账本。
+> 当前版本 `v0.7.3`：**「忆笺」升成了总和名。** 它现在管着三样东西 ——
+> 忆笺 · 记账、忆笺 · 日程、忆小尘（助手不加前缀，它本来就是产品的一部分）。
+> 侧边栏顶部新加了一块「忆笺」抬头，下面才是两个子 App。
+> 程序名、应用标识、数据目录一律没变，升级不会丢账本。
 
 ![界面预览：桌面版忆小尘与手机版总览、记一笔、统计、日程、课表、忆小尘](docs/screenshots/preview.png)
 
-| 忆笺记账 | 忆笺日程 |
+| 忆笺 · 记账 | 忆笺 · 日程 |
 | --- | --- |
-| ![忆笺记账的图标](docs/screenshots/icon.png) | ![忆笺日程的江南风图标](docs/screenshots/icon-schedule.png) |
+| ![忆笺 · 记账的图标](docs/screenshots/icon.png) | ![忆笺 · 日程的江南风图标](docs/screenshots/icon-schedule.png) |
 
-上面那枚是忆笺日程的图标：白墙黛瓦、一叶小舟、三层烟雨，右下角一枚朱红的「程」印。
+右边那枚是忆笺 · 日程的图标：白墙黛瓦、一叶小舟、三层烟雨，右下角一枚朱红的「程」印。
 两枚并排是一套气质——一枚墨色、一枚朱色，冷暖对照。
 
 ---
@@ -26,11 +27,11 @@
 
 | 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows | `yichen-ledger-0.7.2-win-x64.exe` | 安装版，可选安装目录 |
-| Windows | `yichen-ledger-0.7.2-win-x64.zip` | 免安装，解压即用 |
-| macOS（Apple 芯片） | `yichen-ledger-0.7.2-mac-arm64.dmg` | M1/M2/M3/M4 |
-| macOS（Intel） | `yichen-ledger-0.7.2-mac-x64.dmg` | 老款 Mac |
-| Linux | `yichen-ledger-0.7.2-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
+| Windows | `yichen-ledger-0.7.3-win-x64.exe` | 安装版，可选安装目录 |
+| Windows | `yichen-ledger-0.7.3-win-x64.zip` | 免安装，解压即用 |
+| macOS（Apple 芯片） | `yichen-ledger-0.7.3-mac-arm64.dmg` | M1/M2/M3/M4 |
+| macOS（Intel） | `yichen-ledger-0.7.3-mac-x64.dmg` | 老款 Mac |
+| Linux | `yichen-ledger-0.7.3-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
 | Android | `app-debug.apk` | 手机浏览器下载后点安装 |
 | iOS | `yichen-ledger-unsigned.ipa` | **未签名**，需自行重签，见下方说明 |
 
@@ -39,7 +40,7 @@
 > .app 叫 `yichen-ledger.app`，Linux 的可执行文件也是 `yichen-ledger` ——
 > 全是纯 ASCII，省得非 ASCII 名字在安装脚本、注册表、命令行参数里各走一遍
 > 转码；而窗口标题、开始菜单 / 桌面快捷方式、macOS 启动台与 Dock、
-> 控制面板里的名字仍然显示「忆笺记账」。详见下方
+> 控制面板里的名字仍然显示「忆笺」。详见下方
 > [「为什么程序名是英文、界面是中文」](#为什么程序名是英文界面是中文)。
 
 > 没有代码签名证书和 Apple 开发者账号，所以：
@@ -100,7 +101,7 @@
   对比度、饱和度、缩放、偏移、透明度、暗化、适配方式、水平翻转；外加全局字体风格、字号基准、
   文字颜色、强调色、圆角、玻璃面板
 - **iOS 手感**（v0.2.0）：页面横向 push/pop、列表交错淡入、按下回弹、弹层阻尼，尊重系统的「减少动态效果」
-- **忆笺日程**（v0.3.0）：侧边栏与底部导航的入口，一键在「记账 / 日程」之间换整个工作区（v0.7.0 起改成一枚 App 图标，v0.7.1 起桌面端是竖排的图标 + 名称 + 标语）；月 / 周 / 日三种视图；全天、时间区间、地点、标签、颜色、备注；每天 / 每周 / 每月 / 每年的重复规则（含自定义间隔与重复日）；勾选完成、搜索、删除
+- **忆笺 · 日程**（v0.3.0）：侧边栏与底部导航的入口，一键在「记账 / 日程」之间换整个工作区（v0.7.0 起改成一枚 App 图标，v0.7.1 起桌面端是竖排的图标 + 名称 + 标语）；月 / 周 / 日三种视图；全天、时间区间、地点、标签、颜色、备注；每天 / 每周 / 每月 / 每年的重复规则（含自定义间隔与重复日）；勾选完成、搜索、删除
 - **从图片建日程**（v0.3.0）：拍一张课程表或会议通知，填了 API Key 走云端多模态，没填就走本机 OCR（tesseract.js，第一次用要下语言包）
 - **到点提醒**（v0.3.0）：Android / iOS 走系统本地通知，App 关着也能弹；网页版退化成页面内提醒，并明确告知这个限制
 - **忆小尘 · 账**（v0.4.0）：总览 / 统计页右下角的助手按钮。问「这个月花了多少」「哪一类最多」「预算还剩多少」「我现在有多少钱」「哪一类涨得最快」，也能直接说「记一笔午饭 25」——它把账目摆出来给你确认，点「就这样记」才真的落库
@@ -110,14 +111,17 @@
 - **水晶玻璃界面**（v0.6.0）：所有面板级元素（卡片、弹层、侧边栏、底部导航、对话框）统一成 iOS 26 那种液态玻璃——半透 + 模糊 + 提饱和、顶部一道内高光、一圈极细亮边、一层柔和投影；底层铺一层固定的水墨光斑，玻璃才「有东西可透」
 - **浅色主题**（v0.6.0）：跟随系统 / 深色 / 浅色三选一。不是把深色反过来——浅色下靠暗色描边和投影把面板托起来，透明度公式和深色方向相反
 - **玻璃强度**（v0.6.0）：一个 0~150 的滑块（0 = 实心省电，100 = 出厂，150 = 最通透），模糊和饱和度跟着一起走；老设置会自动迁移
+- **「忆笺」成了总和名**（v0.7.3）：原来「忆笺」只是两个子 App 名字的开头（忆笺记账 / 忆笺日程），读起来像两个平行产品。这一版把它抬到顶上当总和名——整个产品叫「忆笺」，底下挂三样东西：**忆笺 · 记账**、**忆笺 · 日程**、**忆小尘**（助手不加前缀，它本来就是产品的一部分，不是并列的第三个模块）。侧边栏顶部新加了一块抬头：一枚「忆」字印 + 名字 + 标语「所记所行，皆有归处」，它不可点，只是一枚抬头
+- **三句标语各说各的**（v0.7.3）：忆笺「所记所行，皆有归处」、忆笺 · 记账「所记皆来路，所忆皆无尘」、忆笺 · 日程「所行皆有期，所至皆有时」。原来记账那句太贴「记账」，挪去当总标语会盖不住日程，所以给忆笺另起了一句能收住三块的
+- **显示名跟着升到「忆笺」**（v0.7.3）：窗口标题、桌面 / 开始菜单快捷方式、macOS 启动台与 Dock、Android 桌面图标名、iOS 主屏名、网页版标题与 PWA 名，全都从「忆笺记账」改成「忆笺」。程序名（`yichen-ledger`）、应用标识（`com.yichen.ledger`）、数据目录一律没动，升级不会丢账本
 - **改名**（v0.7.2）：从「忆尘」改成「忆笺」。「笺」是小幅的纸 —— 账记在一张纸上，日子也记在一张纸上，这正是这个软件在做的事。两枚图标、三语文案、窗口标题、快捷方式、安装包里的显示名全部跟着换；程序名、应用标识、数据目录一律没动，升级不会丢账本
 - **助手名保留**（v0.7.2）：「忆小尘」没改。它读着顺，也没必要和品牌绑死
-- **侧边栏重做**（v0.7.1）：「忆笺记账 / 忆笺日程」两块改成**竖排的图标 + 名称 + 标语**，顶掉了原来那块品牌标题；没选中的那个压暗但照样能点
+- **侧边栏重做**（v0.7.1）：「忆笺记账 / 忆笺日程」两块（v0.7.3 起叫「忆笺 · 记账 / 忆笺 · 日程」）改成**竖排的图标 + 名称 + 标语**，顶掉了原来那块品牌标题；没选中的那个压暗但照样能点
 - **日程 / 课表变成菜单项**（v0.7.1）：原来挂在日程页右上角的两个胶囊标签删掉了，改成侧边栏里的独立菜单项，地址也从小尾巴变成真路由 `#/schedule/timetable`（老链接会自动跳过去）
 - **手机底部导航加「课表」**（v0.7.1）：日程模式下是「日程 / 课表 / 设置」三项，再留一枚切 App 的图标；课表不是日程的子标签，而是并列的第二项
-- **两个 App，两枚图标**（v0.7.0）：原来那个「切换功能」的胶囊删掉了，改成两枚真图标——桌面端在侧边栏（v0.7.1 起竖排并带上名称与标语），手机端在底部导航只露另一个 App 的图标。忆笺日程有了自己的江南风图标（白墙黛瓦、一叶小舟、烟雨里一枚朱红的「程」印），和忆笺记账的水墨图标是一套气质
+- **两个 App，两枚图标**（v0.7.0）：原来那个「切换功能」的胶囊删掉了，改成两枚真图标——桌面端在侧边栏（v0.7.1 起竖排并带上名称与标语），手机端在底部导航只露另一个 App 的图标。忆笺 · 日程有了自己的江南风图标（白墙黛瓦、一叶小舟、烟雨里一枚朱红的「程」印），和忆笺 · 记账的水墨图标是一套气质
 - **忆小尘可拖**（v0.7.0）：右下角那颗按钮按住就能拖，松手自动吸到最近的左右边缘，位置按比例存进库里——换屏幕尺寸、转屏都还在原来的相对高度
-- **课表**（v0.7.0）：忆笺日程里多一个「课表」（v0.7.1 起从页内标签变成侧边栏的独立菜单项）。七列星期 × 节次的网格，支持单双周、周次范围、开学日期与总周数、可自定义的节次时间表；今日剩余课程、冲突提示、单双周图例都在一屏里
+- **课表**（v0.7.0）：忆笺 · 日程里多一个「课表」（v0.7.1 起从页内标签变成侧边栏的独立菜单项）。七列星期 × 节次的网格，支持单双周、周次范围、开学日期与总周数、可自定义的节次时间表；今日剩余课程、冲突提示、单双周图例都在一屏里
 - **从图片建课表**（v0.7.0）：拍一张或贴一张课程表，填了 API Key 走云端多模态（要求返回 JSON，因为一门课有多个时段），没填就走本机规则解析；解析出来的候选逐条勾选再导入，重名课程可以选择覆盖
 - **离线 & 隐私**：无网络依赖、无账号、无埋点
 
@@ -185,7 +189,7 @@ npm install
 # 浏览器里开发（http://localhost:5173）
 npm run dev
 
-# 单元测试（109 个用例，只测纯领域层，不需要浏览器）
+# 单元测试（141 个用例，只测纯领域层，不需要浏览器）
 npm test
 
 # 构建 web 产物到 dist/
@@ -200,7 +204,7 @@ npm run electron
 
 ### 自检脚本
 
-仓库里带了十个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑（另有两个只出图不断言的截图脚本，见下）：
+仓库里带了十一个用来确认「真的能跑」的脚本，CI 或本地改完代码都可以跑（另有两个只出图不断言的截图脚本，见下）：
 
 ```bash
 npm run build
@@ -210,9 +214,10 @@ node scripts/flows.mjs              # 深流程：预算超支、建账户、改
 node scripts/pwa-check.mjs          # 网页版：manifest、图标、SW 缓存、断网后还能打开
 node scripts/live-check.mjs         # 直接打线上 Pages 地址，端到端验证线上那份能用
 node scripts/appearance-check.mjs   # 设置页四组、切语言、上传壁纸、分区独立生效
-node scripts/schedule-check.mjs     # 忆笺日程 + 课表：双 App 入口、月/周/日视图、课表网格、增删改、持久化
+node scripts/schedule-check.mjs     # 忆笺 · 日程 + 课表：双 App 入口、月/周/日视图、课表网格、增删改、持久化
 node scripts/assistant-check.mjs    # 忆小尘：入口位置、问账、记一笔要确认、切模式不丢对话
 node scripts/chat-check.mjs         # 忆小尘闲聊：问候、情绪、算术、报时，且不抢走记账
+node scripts/rail-check.mjs         # 侧边栏三语排版：标语不溢出、两块等高、手机上无横向滚动
 node scripts/cloud-chat-check.mjs   # 云端链路：假 OpenAI 服务，验请求内容、历史、兜底
 node scripts/installed-check.mjs    # 本机装的桌面版是不是当前这份（发版后必跑）
 
@@ -333,8 +338,8 @@ python scripts/make-pwa-assets.py       # 网页版用的那几张 PNG
 「忆」，马善政毛笔楷书备用），只用来生成图标，不进安装包。印章上的「记」用
 宋体加粗后做刀刻处理 —— 本机没有篆书字体，篆书虽是印章正体，但装不上就算了。
 
-产物结构：`yichen-ledger-0.7.2-win-x64.exe`（约 88 MB，可选安装目录）、
-`yichen-ledger-0.7.2-win-x64.zip`（免安装，约 112 MB）。
+产物结构：`yichen-ledger-0.7.3-win-x64.exe`（约 88 MB，可选安装目录）、
+`yichen-ledger-0.7.3-win-x64.zip`（免安装，约 112 MB）。
 
 > **排坑：别在项目目录里跑产出的安装包。** NSIS 生成卸载程序时会执行一次
 > 自己产出的安装包。如果安装包就躺在项目目录里（比如
@@ -360,7 +365,7 @@ python scripts/make-pwa-assets.py       # 网页版用的那几张 PNG
 [electron-builder.config.cjs](electron-builder.config.cjs) 里分开设置。
 
 ```js
-productName: '忆笺记账',        // 窗口标题、快捷方式、启动台、控制面板
+productName: '忆笺',            // 窗口标题、快捷方式、启动台、控制面板
 executableName: 'yichen-ledger', // 程序目录名、可执行文件名 —— 必须是纯 ASCII
 ```
 
@@ -381,10 +386,10 @@ executableName: 'yichen-ledger', // 程序目录名、可执行文件名 —— 
 
 | 平台 | 磁盘上的名字 | 用户看到的名字 |
 | --- | --- | --- |
-| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆笺记账」，窗口标题「忆笺记账」，控制面板「忆笺记账 0.7.2」 |
-| macOS | `/Applications/yichen-ledger.app` | Finder、启动台、Dock 显示「忆笺记账」（来自 `CFBundleName` / `CFBundleDisplayName`） |
-| Linux | `yichen-ledger` 可执行文件 + `*.AppImage` | 应用菜单里显示「忆笺记账」（`.desktop` 的 `Name`） |
-| Android / iOS | `com.yichen.ledger` | 桌面图标下的名字「忆笺记账」 |
+| Windows | `%LOCALAPPDATA%\Programs\yichen-ledger\yichen-ledger.exe` | 开始菜单 / 桌面快捷方式「忆笺」，窗口标题「忆笺」，控制面板「忆笺 0.7.3」 |
+| macOS | `/Applications/yichen-ledger.app` | Finder、启动台、Dock 显示「忆笺」（来自 `CFBundleName` / `CFBundleDisplayName`） |
+| Linux | `yichen-ledger` 可执行文件 + `*.AppImage` | 应用菜单里显示「忆笺」（`.desktop` 的 `Name`） |
+| Android / iOS | `com.yichen.ledger` | 桌面图标下的名字「忆笺」 |
 
 > **换名字不会丢数据。** Electron 的用户数据目录取的是 `package.json` 的
 > `name`，本来就是 `yichen-ledger`（Windows 上是
@@ -396,11 +401,11 @@ executableName: 'yichen-ledger', // 程序目录名、可执行文件名 —— 
 
 | 平台 | CI 里核对什么 |
 | --- | --- |
-| Windows | `release\win-unpacked\yichen-ledger.exe` 存在，且 `FileDescription` 是「忆笺记账」 |
-| macOS | `release/mac-arm64/yichen-ledger.app` 与 `release/mac/yichen-ledger.app` 都存在，`CFBundleName` / `CFBundleDisplayName` 是「忆笺记账」 |
-| Linux | 解出 AppImage，`.desktop` 的 `Name=` 是「忆笺记账」，同目录下的可执行文件是 ASCII |
-| Android | `aapt dump badging` 的 `versionName` 等于 `package.json` 的版本，`application-label` 是「忆笺记账」 |
-| iOS | `App.app` 目录名是 ASCII，`CFBundleDisplayName` 是「忆笺记账」 |
+| Windows | `release\win-unpacked\yichen-ledger.exe` 存在，且 `FileDescription` 是「忆笺」 |
+| macOS | `release/mac-arm64/yichen-ledger.app` 与 `release/mac/yichen-ledger.app` 都存在，`CFBundleName` / `CFBundleDisplayName` 是「忆笺」 |
+| Linux | 解出 AppImage，`.desktop` 的 `Name=` 是「忆笺」，同目录下的可执行文件是 ASCII |
+| Android | `aapt dump badging` 的 `versionName` 等于 `package.json` 的版本，`application-label` 是「忆笺」 |
+| iOS | `App.app` 目录名是 ASCII，`CFBundleDisplayName` 是「忆笺」 |
 
 所以以后谁改配置改坏了，或者发版忘了升版本号，CI 会直接拦住。
 
@@ -483,8 +488,8 @@ npx cap open ios         # 在 Xcode 里运行 / 打包
 把这一步交给 GitHub Actions —— 它三种系统的 runner 都有：
 
 ```bash
-git tag v0.7.2
-git push origin v0.7.2
+git tag v0.7.3
+git push origin v0.7.3
 ```
 
 推一个 `v*` 的 tag 就会并行跑五个任务，然后建一个 Release，把产物挂上去：
@@ -515,10 +520,10 @@ docs/releases/v0.2.0.md
 可以改、可以留着给下个版本抄结构，不用在一堆 YAML 里写长文。
 
 > **产物文件名是纯 ASCII。** GitHub 会把 Release 资产名里的非 ASCII 字符
-> 统统替换成 `.`（`忆笺记账 Setup 0.1.0.exe` 会变成 `Setup.0.1.0.exe`），
+> 统统替换成 `.`（`忆笺 Setup 0.1.0.exe` 会变成 `Setup.0.1.0.exe`），
 > 所以 `electron-builder.config.cjs` 里给三端都设了 `artifactName`，
 > 统一成 `yichen-ledger-<版本>-<平台>-<架构>.<扩展名>`。
-> 装好之后显示的名字、快捷方式、窗口标题仍然是「忆笺记账」，不受影响。
+> 装好之后显示的名字、快捷方式、窗口标题仍然是「忆笺」，不受影响。
 
 
 > **iOS 的包是未签名的。** 没有 Apple 开发者证书，`xcodebuild` 只能出
@@ -576,7 +581,7 @@ src/
   state/notify.ts        到点提醒：原生本地通知 / 网页版降级
   state/ai.ts            云端 AI 配置（Base URL、模型、Key），没配就走本地
   pages/                 总览 / 记一笔 / 统计 / 预算 / 我的 / 账户 / 分类
-  pages/Schedule.tsx     忆笺日程主页面（月 / 周 / 日三视图）
+  pages/Schedule.tsx     忆笺 · 日程主页面（月 / 周 / 日三视图）
   pages/schedule/        日程与课表：ScheduleShell（日程/课表两个标签）、TimetablePage、弹层组件（表单、搜索、图片识别）
   components/AssistantPanel.tsx 忆小尘的对话框（portal 到 body）
   components/AssistantFab.tsx   忆小尘的入口悬浮球（可拖动、吸边、位置存库）
@@ -589,8 +594,8 @@ src/
 public/
   manifest.webmanifest   PWA 清单（名字、图标、快捷方式）
   sw.js                  Service Worker：离线缓存
-  pwa-*.png              网页版图标（忆笺记账）
-  schedule-*.png         忆笺日程的图标（由 scripts/make-schedule-icon.py 生成）
+  pwa-*.png              网页版图标（忆笺 · 记账）
+  schedule-*.png         忆笺 · 日程的图标（由 scripts/make-schedule-icon.py 生成）
 tests/domain.test.ts     记账领域层单元测试
 tests/schedule.test.ts   日程领域层单元测试（重复规则、视图分栏、OCR 猜时间）
 tests/timetable.test.ts  课表领域层单元测试（周次、单双周、课块、冲突、OCR 猜节次）
