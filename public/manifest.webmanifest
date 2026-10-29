@@ -1,17 +1,23 @@
 {
-  "name": "忆笺记账",
-  "short_name": "忆笺记账",
-  "description": "本地优先的个人记账应用，数据只存在你自己的设备上",
+  "name": "忆笺",
+  "short_name": "忆笺",
+  "description": "记账、日程与忆小尘，本地优先，数据只存在你自己的设备上",
   "lang": "zh-CN",
   "dir": "ltr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "portrait-primary",
   "background_color": "#0f1216",
   "theme_color": "#0f1216",
-  "categories": ["finance", "productivity"],
+  "categories": [
+    "finance",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "./pwa-192.png",
@@ -34,16 +40,28 @@
   ],
   "shortcuts": [
     {
-      "name": "记一笔",
+      "name": "忆笺 · 记账",
       "short_name": "记账",
-      "url": "./#/add",
-      "icons": [{ "src": "./pwa-192.png", "sizes": "192x192" }]
+      "description": "记一笔",
+      "url": "./#/",
+      "icons": [
+        {
+          "src": "./pwa-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
-      "name": "看统计",
-      "short_name": "统计",
-      "url": "./#/stats",
-      "icons": [{ "src": "./pwa-192.png", "sizes": "192x192" }]
+      "name": "忆笺 · 日程",
+      "short_name": "日程",
+      "description": "看日程",
+      "url": "./#/schedule",
+      "icons": [
+        {
+          "src": "./schedule-badge.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

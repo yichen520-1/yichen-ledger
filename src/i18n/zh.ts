@@ -11,8 +11,10 @@
 
 export const zh = {
   app: {
-    name: '忆笺记账',
-    tagline: '所记皆来路，所忆皆无尘',
+    /** 总和名：记账 + 日程 + 忆小尘，整个产品就叫这个 */
+    name: '忆笺',
+    /** 忆笺自己的标语。子 App 各有各的，三句不重复。 */
+    tagline: '所记所行，皆有归处',
     localFirst: '本地优先',
   },
 
@@ -298,7 +300,7 @@ export const zh = {
     wipeConfirm2: '真的要清空吗？',
     about: '关于',
     aboutText:
-      '本地优先的个人记账应用，同一套代码运行在 Android、iOS、Windows 和 macOS 上。所有金额以「分」为整数存储，不会有小数误差。',
+      '忆笺是一个本地优先的小工具，把记账、日程和忆小尘放在一起：账记在一张纸上，日子也记在一张纸上。同一套代码运行在 Android、iOS、Windows 和 macOS 上，所有金额以「分」为整数存储，不会有小数误差。',
     viewOnline: '网页版',
     viewSource: '项目主页',
     aiTitle: '忆小尘的钥匙',
@@ -332,7 +334,7 @@ export const zh = {
     accountInUse: '这个账户已有账目，不能删除；可以改为「归档」',
     categoryInUse: '这个分类下已有账目，不能删除',
     builtinCategory: '内置分类不能删除',
-    backupInvalid: '这不是有效的忆笺记账备份文件',
+    backupInvalid: '这不是有效的忆笺备份文件',
     csvEmpty: 'CSV 里没有数据行',
     csvHeader: '表头需要包含「日期」「类型」「金额」三列',
     eventTitleRequired: '给日程起个标题吧',
@@ -348,13 +350,15 @@ export const zh = {
   mode: {
     ledger: '记账',
     schedule: '日程',
-    ledgerApp: '忆笺记账',
-    scheduleApp: '忆笺日程',
+    ledgerApp: '忆笺 · 记账',
+    scheduleApp: '忆笺 · 日程',
+    /** 记账这块自己的标语。app.tagline 已经给了忆笺总品牌，两者不能是同一句 */
+    ledgerTagline: '所记皆来路，所忆皆无尘',
   },
 
-  /** 忆笺日程 */
+  /** 忆笺 · 日程 */
   schedule: {
-    title: '忆笺日程',
+    title: '忆笺 · 日程',
     tagline: '所行皆有期，所至皆有时',
     tabSchedule: '日程',
     tabTimetable: '课表',
@@ -437,7 +441,7 @@ export const zh = {
     untitled: '未命名日程',
   },
 
-  /** 忆笺日程 · 课表 */
+  /** 忆笺 · 日程 · 课表 */
   timetable: {
     weekNo: '第 {n} 周',
     notStarted: '还没开学',
@@ -590,7 +594,7 @@ export const zh = {
       greetingEvening: '晚上好。今天累不累？',
       greetingNight: '这个点还没睡？我在的，想说什么都行。',
       identity:
-        '我叫忆小尘，是「忆笺记账」里的助手。账本和日程的事我都管，别的也能陪你聊两句。',
+        '我叫忆小尘，是「忆笺」里的助手。账本和日程的事我都管，别的也能陪你聊两句。',
       capability:
         '我能做这些：\n· 查账 —— 这个月花了多少、哪类最多、预算还剩多少、账户余额\n· 记账 —— 说「记一笔午饭 25」，我拆好等你确认\n· 日程 —— 这周有什么安排、哪天有空、帮你加一条\n· 闲聊 —— 心情、天气、算个数，都行',
       thanks: '不客气，随时叫我。',

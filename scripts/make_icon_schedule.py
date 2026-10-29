@@ -1,4 +1,4 @@
-"""「忆笺日程」的江南风图标。
+"""「忆笺 · 日程」的江南风图标。
 
 和主图标（水墨「忆」字 + 远山飞雁）同一套纸、墨、印，但意象换成江南水乡：
 
@@ -245,7 +245,7 @@ def _boat(d: ImageDraw.ImageDraw, s: float, cx: float, cy: float, length: float)
 
 
 def draw_schedule_icon(size: int = SIZE, *, full_bleed: bool = False, transparent: bool = False) -> Image.Image:
-    """画「忆笺日程」的图标。
+    """画「忆笺 · 日程」的图标。
 
     full_bleed / transparent 的语义和主图标的 draw_icon 一致：
       full_bleed=True  直角铺满，给 Android legacy 图标；

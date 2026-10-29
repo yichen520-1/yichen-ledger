@@ -6,8 +6,10 @@ import type { Dict } from './zh';
  */
 export const ja: Dict = {
   app: {
-    name: '憶箋記帳',
-    tagline: '記すは来し方、憶うは塵なきこと',
+    /** 総称：家計簿 + 予定 + 憶小塵、まとめてこの一語 */
+    name: '憶箋',
+    /** 憶箋自身のキャッチコピー。サブアプリはそれぞれ別の一言を持つ */
+    tagline: '記すも行くも、帰る場所がある',
     localFirst: 'ローカル優先',
   },
 
@@ -294,7 +296,7 @@ export const ja: Dict = {
     wipeConfirm2: '本当にすべて消しますか？',
     about: 'このアプリについて',
     aboutText:
-      'ローカル優先の個人向け記帳アプリ。同じコードで Android・iOS・Windows・macOS 上で動作します。金額はすべて「銭」単位の整数で保存されるため、誤差は出ません。',
+      '憶箋はローカル優先の小さな道具箱です。家計簿と予定と憶小塵を同じ一枚の紙に載せています。同じコードで Android・iOS・Windows・macOS 上で動作し、金額はすべて「銭」単位の整数で保存されるため誤差は出ません。',
     viewOnline: 'Web 版',
     viewSource: 'プロジェクトページ',
     aiTitle: '憶小塵の鍵',
@@ -324,7 +326,7 @@ export const ja: Dict = {
     accountInUse: 'この口座には記録があるため削除できません。「保管」にしてください',
     categoryInUse: 'このカテゴリには記録があるため削除できません',
     builtinCategory: '標準カテゴリは削除できません',
-    backupInvalid: '有効な憶箋記帳のバックアップファイルではありません',
+    backupInvalid: '有効な憶箋のバックアップファイルではありません',
     csvEmpty: 'CSV にデータ行がありません',
     csvHeader: '見出しには「日付」「種類」「金額」の 3 列が必要です',
     eventTitleRequired: '予定にタイトルを付けてください',
@@ -339,12 +341,13 @@ export const ja: Dict = {
   mode: {
     ledger: '家計簿',
     schedule: '予定',
-    ledgerApp: '憶箋家計簿',
-    scheduleApp: '憶箋スケジュール',
+    ledgerApp: '憶箋 · 家計簿',
+    scheduleApp: '憶箋 · スケジュール',
+    ledgerTagline: '記すは来し方、憶うは塵なきこと',
   },
 
   schedule: {
-    title: '憶箋スケジュール',
+    title: '憶箋 · スケジュール',
     tagline: '行く先には、いつも時がある',
     tabSchedule: '予定',
     tabTimetable: '時間割',
@@ -579,7 +582,7 @@ export const ja: Dict = {
       greetingEvening: 'こんばんは。今日は疲れましたか。',
       greetingNight: 'まだ起きていますか。ここにいますよ、何でも話してください。',
       identity:
-        '憶小塵です。「憶箋記帳」の中のアシスタントで、お金と予定の両方を見ています。それ以外の話も大丈夫です。',
+        '憶小塵です。「憶箋」の中のアシスタントで、お金と予定の両方を見ています。それ以外の話も大丈夫です。',
       capability:
         'できることはこちら：\n· 数字 — 今月いくら使った、一番多い分類、予算の残り、口座残高\n· 記録 — 「昼食 25 を記録」と言えば、確認用に整えます\n· 予定 — 今週の予定、空き時間、予定の追加\n· 雑談 — 気分、天気、ちょっとした計算など',
       thanks: 'どういたしまして。',

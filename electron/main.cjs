@@ -18,7 +18,9 @@ function createWindow() {
     minWidth: 720,
     minHeight: 520,
     backgroundColor: '#0f1216',
-    title: '忆笺记账',
+    // 窗口标题是「忆笺」——总和名，不跟当前在哪个子 App 里变。
+    // 任务栏和 Alt+Tab 上看到的应该是整个产品，不是其中一个模块。
+    title: '忆笺',
     autoHideMenuBar: true,
     // macOS 上把红绿灯按钮嵌进内容区，视觉上和网页版头部更贴合
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
