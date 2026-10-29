@@ -15,6 +15,8 @@ import {
   monthKeyOf,
 } from '../domain/model';
 import type { Transaction } from '../domain/model';
+import { PendingBills } from '../components/PendingBills';
+import { Timeline } from '../components/Timeline';
 
 export default function Dashboard() {
   const { accounts, transactions, categoryOf, accountName } = useLedger();
@@ -100,6 +102,8 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <PendingBills />
+
       <section className="card overview">
         <div className="networth-label">{t('dashboard.netWorth')}</div>
         <div className="networth">{formatCents(worth)}</div>
@@ -177,6 +181,14 @@ export default function Dashboard() {
         <Link to="/stats">{t('common.viewStats')}</Link>
       </div>
       <CategoryMini month={month} />
+
+      <div className="section-title">
+        {t('timeline.title')}
+        <span className="muted" style={{ fontSize: 11.5, fontWeight: 400 }}>
+          {t('timeline.sub')}
+        </span>
+      </div>
+      <Timeline />
 
       <div className="section-title">
         {t('dashboard.recent')}

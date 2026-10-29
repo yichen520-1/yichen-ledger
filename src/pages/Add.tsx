@@ -6,6 +6,8 @@ import { useI18n, useErrorText } from '../i18n';
 import { useToast } from '../components/Toast';
 import { createTransaction, deleteTransaction, updateTransaction } from '../db/repository';
 import { formatCents, parseAmountToCents, toDateKey, type TxType } from '../domain/model';
+import { recentShapes } from '../domain/quick';
+import { createRuleFromTransaction, saveQuickTemplate, shouldOfferRecurring } from '../db/repository';
 
 /**
  * 键盘的四个功能键用固定的 ASCII 标记，显示时才翻译：
@@ -19,7 +21,7 @@ export default function Add() {
   const toast = useToast();
   const { t } = useI18n();
   const errorText = useErrorText();
-  const { accounts, categories, transactions, loading } = useLedger();
+  const { accounts, categories, transactions, quickTemplates, categoryOf, loading } = useLedger();
 
   const editing = id ? transactions.find((tx) => tx.id === id) : undefined;
 
@@ -32,6 +34,8 @@ export default function Add() {
   const [note, setNote] = useState(editing?.note ?? '');
   const [tagsText, setTagsText] = useState(editing?.tags.join(' ') ?? '');
   const [busy, setBusy] = useState(false);
+  // 记完之后那条「要不要每月提醒」的提示：存下刚记的那笔，由用户点「好」或「不用」
+  const [offerRule, setOfferRule] = useState<{ id: string; note: string; amount: number } | null>(null);
   // 编辑模式下，进页面时账目可能还在从 IndexedDB 读；读到之前不能算初始化完成
   const [formSeeded, setFormSeeded] = useState(false);
 
@@ -116,16 +120,91 @@ export default function Add() {
       if (editing) {
         await updateTransaction(editing.id, draft);
         toast(t('add.saved'));
+        navigate('/');
       } else {
-        await createTransaction(draft);
+        const created = await createTransaction(draft);
         toast(t('add.created', { amount: formatCents(cents) }));
+        /*
+         * 记完不立刻跳走：如果这笔长得像固定支出（支出 + 有备注 + 金额不小），
+         * 就在原地问一句「要不要每月提醒」。用户点「不用」再走 ——
+         * 因为一旦跳走，这条提示就没有地方出现了。
+         */
+        if (shouldOfferRecurring(created)) {
+          setOfferRule({ id: created.id, note: created.note, amount: created.amount });
+        } else {
+          navigate('/');
+        }
       }
-      navigate('/');
     } catch (e) {
       toast(errorText(e));
     } finally {
       setBusy(false);
     }
+  }
+
+  /** 把刚记的那笔设成每月提醒 */
+  async function acceptRule() {
+    if (!offerRule) return;
+    const tx = transactions.find((x) => x.id === offerRule.id);
+    if (tx) {
+      await createRuleFromTransaction(tx);
+      toast(t('recurring.fromTxDone', { date: String(Number(tx.date.slice(8, 10))) }));
+    }
+    setOfferRule(null);
+    navigate('/');
+  }
+
+  function declineRule() {
+    setOfferRule(null);
+    navigate('/');
+  }
+
+  /** 把当前表单存成模板（只用已经填好的东西，不写库里的账目） */
+  async function saveTemplate() {
+    const name = window.prompt(t('quick.templateName'), note || '');
+    if (!name || !name.trim()) return;
+    const centsNow = parseAmountToCents(amountText) ?? 0;
+    if (centsNow <= 0) return toast(t('errors.amountInvalid'));
+    try {
+      await saveQuickTemplate(
+        {
+          id: 'tmp',
+          type,
+          amount: centsNow,
+          categoryId,
+          accountId,
+          toAccountId,
+          date,
+          note,
+          tags: tagsText.split(/[\s,，]+/).filter(Boolean),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        name,
+      );
+      toast(t('quick.templateSaved'));
+    } catch (e) {
+      toast(errorText(e));
+    }
+  }
+
+  /** 点一下模板：把类型、金额、分类、账户、备注、标签全填好 */
+  function applyTemplate(tpl: {
+    type: TxType;
+    amount: number;
+    categoryId: string | null;
+    accountId: string;
+    toAccountId: string | null;
+    note: string;
+    tags: string[];
+  }) {
+    setType(tpl.type);
+    setAmountText((tpl.amount / 100).toFixed(2));
+    setCategoryId(tpl.categoryId);
+    setAccountId(tpl.accountId);
+    setToAccountId(tpl.toAccountId);
+    setNote(tpl.note);
+    setTagsText(tpl.tags.join(' '));
   }
 
   async function remove() {
@@ -203,6 +282,54 @@ export default function Add() {
               {amountText === '' ? '0.00' : amountText}
               <span className="suffix">{t('common.currency')}</span>
             </div>
+
+            {/* 快捷记账：上次金额 + 最近记过的 + 自己存的模板。
+                只在新建时出现；改一笔旧账时这里没有意义。
+                高度固定成一行（见 .quick-band），因为它一长就会把数字键盘
+                最后一行顶出屏幕 —— 手机上滚不到就点不着「确定」。 */}
+            {!editing && (quickTemplates.length > 0 || recentShapes(transactions).length > 0) ? (
+              <div className="quick-band">
+                <div className="quick-head">
+                  <span className="k">{t('quick.title')}</span>
+                  {canSubmit ? (
+                    <button className="mini-btn" onClick={saveTemplate}>
+                      {t('quick.templateSave')}
+                    </button>
+                  ) : null}
+                </div>
+                <div className="quick-strip">
+                  {quickTemplates.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      className="quick-chip"
+                      onClick={() => applyTemplate(tpl)}
+                      title={t('quick.templateUse')}
+                    >
+                      <span className="n">
+                        <span className="ico">{categoryOf(tpl.categoryId)?.icon ?? '⭐'}</span> {tpl.name}
+                      </span>
+                      <span className="m">{formatCents(tpl.amount)}</span>
+                    </button>
+                  ))}
+                  {recentShapes(transactions).map((tx) => {
+                    const cat = categoryOf(tx.categoryId);
+                    return (
+                      <button
+                        key={tx.id}
+                        className="quick-chip"
+                        onClick={() => applyTemplate(tx)}
+                        title={t('quick.lastSame')}
+                      >
+                        <span className="n">
+                          <span className="ico">{cat?.icon ?? '🧾'}</span> {cat?.name ?? (tx.note || '—')}
+                        </span>
+                        <span className="m">{formatCents(tx.amount)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             {type === 'transfer' ? (
               <>
@@ -309,6 +436,22 @@ export default function Add() {
           </div>
         </div>
       )}
+
+      {/* 记完一笔后问「要不要每月提醒」。放在 add-page 底部而不是弹层，
+          因为弹层会挡住数字键盘；这条只是加一句话，用户答完就走。 */}
+      {offerRule ? (
+        <div className="remind-strip">
+          <span className="grow">
+            {t('recurring.fromTxAsk')}（{formatCents(offerRule.amount)}）
+          </span>
+          <button className="mini-btn primary" onClick={acceptRule}>
+            {t('recurring.fromTxYes')}
+          </button>
+          <button className="mini-btn" onClick={declineRule}>
+            {t('recurring.fromTxNo')}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

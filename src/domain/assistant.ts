@@ -34,6 +34,7 @@ import {
   type TxType,
 } from './model';
 import {
+  addDays,
   expandRange,
   monthGrid,
   minutesOf,
@@ -42,6 +43,8 @@ import {
   type EventItem,
   type Occurrence,
 } from './schedule';
+import { fixedTotals, pendingBills, type RecurringRule } from './recurring';
+import { weekRangeOf, weekSchedule, weekStats } from './weekly';
 
 /* ------------------------------------------------------------------ 时间区间 */
 
@@ -235,6 +238,58 @@ export type Answer =
   | { kind: 'nextEvents'; items: Array<{ title: string; date: string; time: string }> }
   | { kind: 'proposeTransaction'; action: ProposedTransaction; note: string }
   | { kind: 'proposeEvent'; action: ProposedEvent; note: string }
+  /* ---- v0.8.0 跨模块 ---- */
+  | {
+      kind: 'txList';
+      /** 查的是哪一段时间 */
+      period: Period;
+      /** 命中的笔数（可能多于 items.length） */
+      count: number;
+      total: number;
+      items: Array<{ id: string; title: string; date: string; amount: number; type: TxType; categoryName: string | null }>;
+      /** 用户问的是某个分类时带上分类名，用来拼「这个月看电影花了 3 次」 */
+      categoryName: string | null;
+    }
+  | {
+      kind: 'forecast';
+      /** 往后看的起止 */
+      from: string;
+      to: string;
+      /** 这几天有几项日程 */
+      eventCount: number;
+      /** 这几天已经排了事的日期（去重升序） */
+      busyDates: string[];
+      /** 这几天已经花掉的钱 */
+      spent: number;
+      /** 按最近 30 天日均推算出来的、这几天大概还会花多少 */
+      expected: number;
+      /** 日均（分） */
+      dailyAvg: number;
+      /** 这几个日期里每天大概花多少 */
+      perDay: Array<{ date: string; events: number; expected: number }>;
+    }
+  | {
+      kind: 'bills';
+      /** 待确认的账单 */
+      items: Array<{ title: string; date: string; amount: number; overdueDays: number }>;
+      /** 每月固定支出合计 */
+      fixedExpense: number;
+      /** 每月固定收入合计 */
+      fixedIncome: number;
+    }
+  | {
+      kind: 'weekly';
+      from: string;
+      to: string;
+      expense: number;
+      income: number;
+      lastExpense: number;
+      delta: number;
+      deltaPct: number | null;
+      eventCount: number;
+      topCategoryName: string | null;
+      topCategoryAmount: number;
+    }
   | { kind: 'unknown'; mode: 'ledger' | 'schedule'; hints: string[] };
 
 export interface ProposedTransaction {
@@ -261,6 +316,13 @@ export interface LedgerSnapshot {
   categories: Category[];
   transactions: Transaction[];
   budgets: Budget[];
+  /**
+   * v0.8.0 跨模块问答要用到的东西。
+   * 都设成可选：老的调用点（单测、日程侧）不传也能跑，
+   * 只是跨模块那几类问题会退化成 unknown。
+   */
+  events?: EventItem[];
+  rules?: RecurringRule[];
 }
 
 export interface ScheduleSnapshot {
@@ -416,6 +478,119 @@ export function answerLedger(text: string, snap: LedgerSnapshot): Answer {
         name: snap.categories.find((c) => c.id === x.categoryId)?.name ?? '—',
         amount: x.amount,
       })),
+    };
+  }
+
+  /* ================================================================
+   * v0.8.0 跨模块问答
+   * ----------------------------------------------------------------
+   * 下面这几段都同时要用到账本和日程。放在最后、unknown 之前，
+   * 是因为它们的关键词比较「泛」（「几次」「那几天」「待确认」），
+   * 排在前面会把「这个月花了多少」这类基础问题抢走。
+   * ================================================================ */
+
+  /* ---- 「这个月看电影花了几次，分别是哪几天」 ---- */
+  // 关键词组合：次数 + 花钱（或直接问「哪几笔」）。分类靠 matchCategory 认。
+  if (/(几次|几笔|哪几笔|哪几天|哪几号|都花在哪|花了几次)/.test(t) && /(花|支出|消费|买|用)/.test(t)) {
+    const cat = matchCategory(t, snap.categories, 'expense');
+    const list = txsInPeriod(snap.transactions, period)
+      .filter((tx) => tx.type === 'expense' && (!cat || tx.categoryId === cat.id))
+      .sort((a, b) => b.date.localeCompare(a.date));
+    return {
+      kind: 'txList',
+      period,
+      count: list.length,
+      total: list.reduce((acc, tx) => acc + tx.amount, 0),
+      items: list.slice(0, 12).map((tx) => ({
+        id: tx.id,
+        title: tx.note || snap.categories.find((c) => c.id === tx.categoryId)?.name || '—',
+        date: tx.date,
+        amount: tx.amount,
+        type: tx.type,
+        categoryName: snap.categories.find((c) => c.id === tx.categoryId)?.name ?? null,
+      })),
+      categoryName: cat?.name ?? null,
+    };
+  }
+
+  /* ---- 「下周有几场活动，那几天大概要花多少」 ---- */
+  if (
+    /(下周|未来几天|接下来几天|这几天)/.test(t) &&
+    /(花|开销|支出|活动|日程|几场|安排|忙)/.test(t)
+  ) {
+    const events = snap.events ?? [];
+    const from = addDays(snap.today, 1);
+    const to = addDays(snap.today, /(下周)/.test(t) ? 7 : 3);
+    const occ = expandRange(events, from, to);
+    const busyDates = [...new Set(occ.map((o) => o.date))].sort();
+
+    // 日均：用最近 30 天的支出算，只算真正过去的日子
+    const since = addDays(snap.today, -29);
+    const recent = snap.transactions.filter(
+      (tx) => tx.type === 'expense' && tx.date >= since && tx.date <= snap.today,
+    );
+    const dailyAvg = Math.round(recent.reduce((acc, tx) => acc + tx.amount, 0) / 30);
+    const perDay = busyDates.map((date) => ({
+      date,
+      events: occ.filter((o) => o.date === date).length,
+      expected: dailyAvg,
+    }));
+    const spent = snap.transactions
+      .filter((tx) => tx.type === 'expense' && tx.date >= from && tx.date <= to)
+      .reduce((acc, tx) => acc + tx.amount, 0);
+
+    return {
+      kind: 'forecast',
+      from,
+      to,
+      eventCount: occ.length,
+      busyDates,
+      spent,
+      // 有日程的那几天按日均算，没日程的那几天也算 —— 人不会因为没日程就不吃饭
+      expected: dailyAvg * (busyDates.length || (/(下周)/.test(t) ? 7 : 3)),
+      dailyAvg,
+      perDay,
+    };
+  }
+
+  /* ---- 「有哪些账单该记了」「待确认的账单」 ---- */
+  if (/(待确认|该记了|要交|要付|该付|到期|自动扣|固定支出|周期账单|定期|账单)/.test(t)) {
+    const rules = snap.rules ?? [];
+    const bills = pendingBills(rules, snap.today);
+    const fixed = fixedTotals(rules);
+    return {
+      kind: 'bills',
+      items: bills.slice(0, 8).map((b) => ({
+        title: b.rule.title,
+        date: b.date,
+        amount: b.rule.amount,
+        overdueDays: b.overdueDays,
+      })),
+      fixedExpense: fixed.expense,
+      fixedIncome: fixed.income,
+    };
+  }
+
+  /* ---- 「这周怎么样」「来个周报」 ---- */
+  if (/(这周|本周|这一周|周报|上周).*(怎么样|如何|情况|总结|花了|花了多少)|(周报)/.test(t)) {
+    const range = weekRangeOf(snap.today);
+    const stats = weekStats(snap.transactions, range);
+    const sched = weekSchedule(snap.events ?? [], range);
+    const top = stats.topCategory
+      ? snap.categories.find((c) => c.id === stats.topCategory!.categoryId)?.name ?? null
+      : null;
+    return {
+      kind: 'weekly',
+      from: stats.from,
+      to: stats.to,
+      expense: stats.expense,
+      income: stats.income,
+      lastExpense: stats.lastExpense,
+      delta: stats.delta,
+      deltaPct: stats.deltaPct,
+      eventCount: sched.total,
+      topCategoryName: top,
+      topCategoryAmount: stats.topCategory?.amount ?? 0,
     };
   }
 
@@ -748,6 +923,42 @@ export function buildLedgerContext(snap: LedgerSnapshot, lang: string): string {
     );
   }
   lines.push(`[账户] ${snap.accounts.filter((a) => !a.archived).map((a) => `${a.name} ${formatCents(accountBalance(a, snap.transactions))}`).join('；')}`);
+
+  // v0.8.0：把日程和周期账单也塞进上下文，
+  // 否则云端模型只能看见钱，看不见「下周三有个事」这种前提。
+  const events = snap.events ?? [];
+  const rules = snap.rules ?? [];
+  const week = weekRangeOf(snap.today);
+  const ws = weekStats(snap.transactions, week);
+  const wsch = weekSchedule(events, week);
+  lines.push(
+    `[本周 ${week.from}~${week.to}] 支出 ${formatCents(ws.expense)}，日程 ${wsch.total} 项（完成 ${wsch.done}）`,
+  );
+  if (events.length) {
+    const upcoming = expandRange(events, snap.today, addDays(snap.today, 14)).slice(0, 10);
+    if (upcoming.length) {
+      lines.push(
+        '[未来两周日程] ' +
+          upcoming
+            .map((o) => `${o.date} ${o.event.allDay ? '全天' : o.event.startTime} ${o.event.title}`)
+            .join('；'),
+      );
+    }
+  }
+  if (rules.length) {
+    const fixed = fixedTotals(rules);
+    const bills = pendingBills(rules, snap.today);
+    lines.push(`[固定支出] 每月 ${formatCents(fixed.expense)}，每月固定收入 ${formatCents(fixed.income)}`);
+    if (bills.length) {
+      lines.push(
+        '[待确认账单] ' +
+          bills
+            .slice(0, 6)
+            .map((b) => `${b.date} ${b.rule.title} ${formatCents(b.rule.amount)}${b.overdueDays > 0 ? `（逾期 ${b.overdueDays} 天）` : ''}`)
+            .join('；'),
+      );
+    }
+  }
   return lines.join('\n');
 }
 

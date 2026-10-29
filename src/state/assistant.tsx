@@ -9,7 +9,7 @@ import {
   type ScheduleSnapshot,
 } from '../domain/assistant';
 import { detectSmallTalk, isFollowUp, type LastQuery, type SmallTalk } from '../domain/chat';
-import { formatCents, monthKeyOf } from '../domain/model';
+import { formatCents, monthKeyOf, toDateKey } from '../domain/model';
 import { useLedger } from './LedgerContext';
 import { useMode } from './ModeContext';
 import { useI18n, type DictKey } from '../i18n';
@@ -249,6 +249,71 @@ export function renderAnswer(
       return t('assistant.ans.proposeEvent', { summary });
     }
 
+    case 'txList': {
+      if (answer.count === 0) return t('assistant.ans.txListEmpty', { period: p(answer.period) });
+      // 每笔一行：日期 + 标题 + 金额。超过 12 笔只报前 12 笔，正文里说清总数。
+      const list = answer.items
+        .map((x) => `· ${x.date.slice(5)} ${x.title} ${formatCents(x.amount)}`)
+        .join('\n');
+      return answer.categoryName
+        ? t('assistant.ans.txList', {
+            period: p(answer.period),
+            cat: answer.categoryName,
+            n: answer.count,
+            list,
+          })
+        : t('assistant.ans.txListNoCat', { period: p(answer.period), n: answer.count, list });
+    }
+
+    case 'forecast': {
+      // 没有日程也要把钱说完 —— 人不会因为没安排就不吃饭，
+      // 只回一句「没有日程」等于没回答问题。
+      if (answer.eventCount === 0 && answer.busyDates.length === 0) {
+        return t('assistant.ans.forecastNoEvents', {
+          from: answer.from,
+          to: answer.to,
+          avg: formatCents(answer.dailyAvg),
+          total: formatCents(answer.expected),
+        });
+      }
+      return t('assistant.ans.forecast', {
+        from: answer.from,
+        to: answer.to,
+        n: answer.eventCount,
+        days: 30,
+        avg: formatCents(answer.dailyAvg),
+        total: formatCents(answer.expected),
+      });
+    }
+
+    case 'bills': {
+      if (answer.items.length === 0 && answer.fixedExpense === 0) return t('assistant.ans.billsEmpty');
+      const list = answer.items
+        .map(
+          (x) =>
+            `· ${x.date.slice(5)} ${x.title} ${x.amount > 0 ? formatCents(x.amount) : t('recurring.amountUnset')}`,
+        )
+        .join('\n');
+      // 从日程生成的规则没有金额。这时说「合计 ¥0.00」会让人以为真的不花钱，
+      // 所以换一句话，把「金额待填」明说出来。
+      if (answer.items.length > 0 && answer.items.every((x) => x.amount === 0)) {
+        return t('assistant.ans.billsNoAmount', { n: answer.items.length, list });
+      }
+      return t('assistant.ans.bills', {
+        n: answer.items.length,
+        total: formatCents(answer.fixedExpense),
+        list,
+      });
+    }
+
+    case 'weekly':
+      return t('assistant.ans.weekly', {
+        range: `${answer.from.slice(5)} – ${answer.to.slice(5)}`,
+        spend: formatCents(answer.expense),
+        income: formatCents(answer.income),
+        events: answer.eventCount,
+      });
+
     case 'unknown':
       return answer.mode === 'ledger' ? t('assistant.ans.unknownLedger') : t('assistant.ans.unknownSchedule');
   }
@@ -314,7 +379,7 @@ export function renderSmallTalk(
 }
 
 export function useAssistant(): AssistantState {
-  const { accounts, categories, transactions, budgets, events } = useLedger();
+  const { accounts, categories, transactions, budgets, events, rules } = useLedger();
   const { mode } = useMode();
   const { t, lang, dict } = useI18n();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -339,11 +404,20 @@ export function useAssistant(): AssistantState {
   }, []);
 
   const ledgerSnap = useMemo<LedgerSnapshot>(
-    () => ({ today: new Date().toISOString().slice(0, 10), accounts, categories, transactions, budgets }),
-    [accounts, categories, transactions, budgets],
+    () => ({
+      today: toDateKey(new Date()),
+      accounts,
+      categories,
+      transactions,
+      budgets,
+      // v0.8.0：跨模块问答（「那几天大概要花多少」「有哪些账单该记了」）要用日程和规则
+      events,
+      rules,
+    }),
+    [accounts, categories, transactions, budgets, events, rules],
   );
   const scheduleSnap = useMemo<ScheduleSnapshot>(
-    () => ({ today: new Date().toISOString().slice(0, 10), events }),
+    () => ({ today: toDateKey(new Date()), events }),
     [events],
   );
 

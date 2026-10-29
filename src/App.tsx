@@ -3,9 +3,12 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'reac
 import {
   BarChart3,
   CalendarDays,
+  CalendarRange,
   Grid3x3,
   LayoutDashboard,
   Plus,
+  Repeat,
+  Search,
   Settings2,
   Target,
   Wallet,
@@ -28,6 +31,9 @@ import Budgets from './pages/Budgets';
 import SettingsPage from './pages/SettingsPage';
 import Accounts from './pages/Accounts';
 import Categories from './pages/Categories';
+import SearchPage from './pages/SearchPage';
+import Weekly from './pages/Weekly';
+import Recurring from './pages/Recurring';
 import { ScheduleShell } from './pages/schedule/ScheduleShell';
 
 /** 导航项：标签在渲染时用 t() 取，这样切语言不需要重建数组 */
@@ -38,6 +44,18 @@ const NAV: Array<{ to: string; label: DictKey; icon: typeof LayoutDashboard; end
   { to: '/settings', label: 'nav.settings', icon: Settings2, end: false },
 ];
 
+/**
+ * 侧边栏「记账」模式下多出来的两项
+ * ------------------------------------------------------------------
+ * 搜索和周期账单不放进底部导航条：手机上那一条已经有 5 格 + 1 个 App 切换，
+ * 再塞就挤成一排图标了。它们是「想找的时候才去」的页面，放侧边栏正合适。
+ */
+const EXTRA: Array<{ to: string; label: DictKey; icon: typeof Search }> = [
+  { to: '/search', label: 'nav.search', icon: Search },
+  { to: '/recurring', label: 'nav.recurring', icon: Repeat },
+  { to: '/weekly', label: 'nav.weekly', icon: CalendarRange },
+];
+
 /** 日程模式下的导航只有两项，直接在 JSX 里写，不走 NAV 数组 */
 
 /**
@@ -46,7 +64,20 @@ const NAV: Array<{ to: string; label: DictKey; icon: typeof LayoutDashboard; end
  * 记账页（/add、/edit/:id）不参与左右推入，它是从底部盖上来的一层。
  * 其它页面按「导航顺序」判断是从左边来还是右边来，做出 iOS 那种方向感。
  */
-const ORDER = ['/', '/stats', '/budgets', '/settings', '/accounts', '/categories', '/schedule', '/schedule/timetable'];
+const ORDER = [
+  '/',
+  '/stats',
+  '/budgets',
+  '/settings',
+  '/accounts',
+  '/categories',
+  '/search',
+  '/recurring',
+  '/weekly',
+  '/weekly',
+  '/schedule',
+  '/schedule/timetable',
+];
 
 function Shell() {
   const { ready, error } = useLedger();
@@ -178,6 +209,16 @@ function Shell() {
                 <Wallet size={17} />
                 {t('nav.accounts')}
               </NavLink>
+              {EXTRA.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                >
+                  <item.icon size={17} />
+                  {t(item.label)}
+                </NavLink>
+              ))}
             </>
           )}
 
@@ -206,6 +247,9 @@ function Shell() {
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/accounts" element={<Accounts />} />
                 <Route path="/categories" element={<Categories />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/recurring" element={<Recurring />} />
+                <Route path="/weekly" element={<Weekly />} />
                 <Route path="/schedule" element={<ScheduleShell />} />
                 <Route path="/schedule/timetable" element={<ScheduleShell />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

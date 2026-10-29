@@ -54,7 +54,19 @@ export function AssistantPanel({ open, onClose }: { open: boolean; onClose: () =
     if (mode === 'schedule') {
       return ['assistant.ask.week', 'assistant.ask.free', 'assistant.ask.addEvent'];
     }
-    return ['assistant.ask.spend', 'assistant.ask.top', 'assistant.ask.budget', 'assistant.ask.net', 'assistant.ask.add'];
+    // v0.8.0：多给三个跨模块的问题 —— 它们是这个 App 才答得出的，
+    // 光看账本或光看日程都答不了。放在最后，不挤掉最常问的那几个。
+    return [
+      'assistant.ask.spend',
+      'assistant.ask.top',
+      'assistant.ask.budget',
+      'assistant.ask.net',
+      'assistant.ask.add',
+      'assistant.ask.txList',
+      'assistant.ask.forecast',
+      'assistant.ask.bills',
+      'assistant.ask.weekly',
+    ];
   }, [mode]);
 
   async function submit(text: string) {

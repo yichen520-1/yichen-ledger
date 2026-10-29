@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
+import { createRuleFromEvent } from '../db/repository';
 import { useI18n, useErrorText } from '../i18n';
 import { useLedger } from '../state/LedgerContext';
 import {
@@ -462,10 +463,12 @@ function EventSheet({
   const [reminders, setReminders] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [seeded, setSeeded] = useState(false);
+  const [ruleDone, setRuleDone] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setSeeded(false);
+      setRuleDone(false);
       return;
     }
     if (seeded) return;
@@ -551,6 +554,30 @@ function EventSheet({
       setBusy(false);
     }
   }
+  /**
+   * 从这条日程生成一条周期账单
+   * ------------------------------------------------------------------
+   * 这是「记账 + 日程」的第一个交叉点：一个「每月 15 日还信用卡」的日程，
+   * 本来就既是一件事、也是一笔钱。以前用户要在两个 App 里各记一次。
+   *
+   * 只搬运能确定的字段：标题、日期（决定每月的哪一天）。
+   * 金额日程里没有，所以建出来的规则金额是 0，让用户到周期账单页去填 ——
+   * 猜一个金额比留空更糟，用户会以为记的是对的。
+   */
+  async function makeRule() {
+    if (!initial) return;
+    setBusy(true);
+    try {
+      await createRuleFromEvent(initial);
+      setRuleDone(true);
+      toast(t('recurring.fromEventDone'));
+    } catch (e) {
+      toast(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
 
   return (
     <Sheet open={open} onClose={onClose} title={initial ? t('schedule.editSheet') : t('schedule.newSheet')}>
@@ -698,6 +725,16 @@ function EventSheet({
           ))}
         </div>
       </div>
+
+      {/* 日程 → 周期账单：只有已保存的日程才给这个入口，新建中的日程还没 id */}
+      {initial && !ruleDone ? (
+        <div className="remind-strip" style={{ marginTop: 0, marginBottom: 12 }}>
+          <span className="grow">{t('recurring.fromEvent')}</span>
+          <button className="mini-btn primary" onClick={() => void makeRule()} disabled={busy}>
+            {t('recurring.fromEvent')}
+          </button>
+        </div>
+      ) : null}
 
       <div className="row gap sheet-actions">
         {initial ? (

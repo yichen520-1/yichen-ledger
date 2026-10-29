@@ -1,7 +1,7 @@
 {
   "name": "yichen-ledger",
   "private": true,
-  "version": "0.7.3",
+  "version": "0.8.0",
   "description": "忆笺 — a local-first app for ledger, schedule and assistant, on Android, iOS, Windows and macOS",
   "author": "yichen520-1",
   "license": "MIT",

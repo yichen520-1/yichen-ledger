@@ -2,8 +2,12 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, seedIfEmpty } from '../db';
 import type { Account, Budget, Category, Transaction } from '../domain/model';
+import type { PendingBill, RecurringRule } from '../domain/recurring';
+import { pendingBills } from '../domain/recurring';
+import { toDateKey } from '../domain/model';
 import type { EventItem } from '../domain/schedule';
 import { defaultTimetableMeta, type Course, type TimetableMeta } from '../domain/timetable';
+import type { QuickTemplate } from '../domain/quick';
 import { useI18n } from '../i18n';
 
 interface LedgerState {
@@ -17,6 +21,12 @@ interface LedgerState {
   budgets: Budget[];
   events: EventItem[];
   courses: Course[];
+  /** 周期账单规则 */
+  rules: RecurringRule[];
+  /** 到日子了、还没确认的账单（按逾期天数倒序） */
+  pending: PendingBill[];
+  /** 快捷记账模板（新的在前） */
+  quickTemplates: QuickTemplate[];
   /** 课表的开学日期 / 总周数 / 节次时间表 */
   timetable: TimetableMeta;
   accountName: (id: string | null | undefined) => string;
@@ -53,6 +63,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const budgets = useLiveQuery(() => db.budgets.toArray());
   const events = useLiveQuery(() => db.events.toArray());
   const courses = useLiveQuery(() => db.courses.toArray());
+  const rules = useLiveQuery(() => db.recurring.toArray());
+  const quickRows = useLiveQuery(() => db.quick.toArray());
   // 课表设置只有一个键，但它是 JSON —— 和课程一起在这里订阅，
   // 这样课表页改了开学日期，别的页面（首页「今天几节课」）立刻跟着变。
   //
@@ -69,6 +81,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     budgets === undefined ||
     events === undefined ||
     courses === undefined ||
+    rules === undefined ||
+    quickRows === undefined ||
     metaRow === undefined;
   const ready = seeded && !loading;
 
@@ -104,11 +118,30 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       budgets: budgets ?? [],
       events: events ?? [],
       courses: courses ?? [],
+      rules: rules ?? [],
+      // 待确认账单是纯计算出来的：规则表一变，这里立刻跟着重算。
+      // 放在 context 里而不是每个页面各算一遍，是因为总览和预算页都要用它。
+      pending: pendingBills(rules ?? [], toDateKey(new Date())),
+      quickTemplates: (quickRows ?? []).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       timetable,
       accountName: (id) => (id ? accMap.get(id) ?? t('common.deletedAccount') : ''),
       categoryOf: (id) => (id ? catMap.get(id) : undefined),
     };
-  }, [ready, loading, error, accounts, categories, transactions, budgets, events, courses, metaRow, t]);
+  }, [
+    ready,
+    loading,
+    error,
+    accounts,
+    categories,
+    transactions,
+    budgets,
+    events,
+    courses,
+    rules,
+    quickRows,
+    metaRow,
+    t,
+  ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

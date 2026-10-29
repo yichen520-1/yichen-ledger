@@ -14,6 +14,17 @@ import {
 } from '../domain/model';
 import { newEvent, type EventItem } from '../domain/schedule';
 import {
+  billToDraft,
+  newRule,
+  pendingBills,
+  ruleDatesBetween,
+  ruleFromEvent,
+  ruleFromTransaction,
+  type PendingBill,
+  type RecurringRule,
+} from '../domain/recurring';
+import { templateFromTransaction, upsertTemplate, type QuickTemplate } from '../domain/quick';
+import {
   clampWeek,
   defaultTimetableMeta,
   newCourse,
@@ -60,7 +71,10 @@ export type ErrorCode =
   | 'errors.timeOrder'
   | 'errors.courseNameRequired'
   | 'errors.courseSessionRequired'
-  | 'errors.courseTimeInvalid';
+  | 'errors.courseTimeInvalid'
+  | 'errors.ruleTitleRequired'
+  | 'errors.ruleAmountInvalid'
+  | 'errors.ruleStartInvalid';
 
 export class ValidationError extends Error {
   readonly code: ErrorCode;
@@ -262,21 +276,23 @@ export async function toggleEventDone(ev: EventItem, date: string): Promise<void
 
 /** 导出全部数据为 JSON（备份用） */
 export async function exportBackup(): Promise<string> {
-  const [accounts, categories, transactions, budgets, events, courses, settings] = await Promise.all([
+  const [accounts, categories, transactions, budgets, events, courses, recurring, quick, settings] = await Promise.all([
     db.accounts.toArray(),
     db.categories.toArray(),
     db.transactions.toArray(),
     db.budgets.toArray(),
     db.events.toArray(),
     db.courses.toArray(),
+    db.recurring.toArray(),
+    db.quick.toArray(),
     db.settings.toArray(),
   ]);
   return JSON.stringify(
     {
       app: 'yichen-ledger',
-      // 备份格式版本：2 起多了 events 字段，3 起多了 courses。
-      // 老备份（version 1/2）仍然能导入，缺的字段就当空。
-      version: 3,
+      // 备份格式版本：2 起多了 events 字段，3 起多了 courses，4 起多了 recurring，
+      // 5 起多了 quick（快捷记账模板）。老备份仍然能导入，缺的字段就当空。
+      version: 5,
       exportedAt: new Date().toISOString(),
       accounts,
       categories,
@@ -284,6 +300,8 @@ export async function exportBackup(): Promise<string> {
       budgets,
       events,
       courses,
+      recurring,
+      quick,
       // 设置也一起带走：主题、语言、AI 配置、课表开学日期都在这里。
       // 备份的本意是「换设备能接着用」，少了设置就得重配一遍。
       settings: settings.filter((s) => s.key !== 'ai.config'),
@@ -302,6 +320,8 @@ export async function importBackup(json: string): Promise<void> {
     budgets?: Budget[];
     events?: EventItem[];
     courses?: Course[];
+    recurring?: RecurringRule[];
+    quick?: QuickTemplate[];
     settings?: Array<{ key: string; value: string }>;
   };
   if (!Array.isArray(data.accounts) || !Array.isArray(data.transactions)) {
@@ -309,7 +329,7 @@ export async function importBackup(json: string): Promise<void> {
   }
   await db.transaction(
     'rw',
-    [db.accounts, db.categories, db.transactions, db.budgets, db.events, db.courses, db.settings],
+    [db.accounts, db.categories, db.transactions, db.budgets, db.events, db.courses, db.recurring, db.quick, db.settings],
     async () => {
       await Promise.all([
         db.accounts.clear(),
@@ -318,6 +338,8 @@ export async function importBackup(json: string): Promise<void> {
         db.budgets.clear(),
         db.events.clear(),
         db.courses.clear(),
+        db.recurring.clear(),
+        db.quick.clear(),
       ]);
       await db.accounts.bulkPut(data.accounts ?? []);
       await db.categories.bulkPut(data.categories ?? []);
@@ -325,6 +347,8 @@ export async function importBackup(json: string): Promise<void> {
       await db.budgets.bulkPut(data.budgets ?? []);
       await db.events.bulkPut(data.events ?? []);
       await db.courses.bulkPut(data.courses ?? []);
+      await db.recurring.bulkPut(data.recurring ?? []);
+      await db.quick.bulkPut(data.quick ?? []);
       // 设置不清空：AI 的 API Key 是本机的，不该被一份别处导出的备份覆盖掉。
       for (const s of data.settings ?? []) {
         if (s?.key && s.key !== 'ai.config') await db.settings.put(s);
@@ -590,4 +614,225 @@ export async function importCourses(courses: Course[], replaceSameName = true): 
     await db.courses.bulkPut(courses);
   });
   return courses.length;
+}
+
+/* -------------------------------------------------------------- 周期账单 */
+
+/** 周期账单草稿（新建 / 编辑规则时表单填的东西） */
+export interface RuleDraft {
+  title: string;
+  type: Exclude<TxType, 'transfer'>;
+  amountText: string;
+  categoryId: string | null;
+  accountId: string;
+  freq: RecurringRule['freq'];
+  intervalText: string;
+  startDate: string;
+  endDate: string | null;
+  dayOfMonth: number | null;
+  weekday: number | null;
+  monthOfYear: number | null;
+  note: string;
+  tagsText: string;
+}
+
+/** 校验规则草稿 */
+export function validateRuleDraft(draft: RuleDraft): {
+  amount: number;
+  interval: number;
+} {
+  if (!draft.title.trim()) throw new ValidationError('errors.ruleTitleRequired');
+  const amount = parseAmountToCents(draft.amountText);
+  if (amount === null || amount <= 0) throw new ValidationError('errors.ruleAmountInvalid');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.startDate)) throw new ValidationError('errors.ruleStartInvalid');
+  if (draft.endDate && draft.endDate < draft.startDate) throw new ValidationError('errors.ruleStartInvalid');
+  if (!draft.accountId) throw new ValidationError('errors.accountRequired');
+  if (!draft.categoryId) throw new ValidationError('errors.categoryRequired');
+  const interval = Math.max(1, Math.min(99, Number(draft.intervalText) || 1));
+  return { amount, interval };
+}
+
+export async function listRules(): Promise<RecurringRule[]> {
+  const all = await db.recurring.toArray();
+  // 没归档的排前面，然后按下次到期日由近到远
+  return all.sort((a, b) => {
+    if (a.archived !== b.archived) return a.archived ? 1 : -1;
+    return a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title, 'zh-CN');
+  });
+}
+
+export async function saveRule(draft: RuleDraft, id?: string): Promise<RecurringRule> {
+  const { amount, interval } = validateRuleDraft(draft);
+  const now = new Date().toISOString();
+  if (id) {
+    const old = await db.recurring.get(id);
+    if (!old) throw new ValidationError('errors.notFound');
+    const rule: RecurringRule = {
+      ...old,
+      title: draft.title.trim(),
+      type: draft.type,
+      amount,
+      categoryId: draft.categoryId,
+      accountId: draft.accountId,
+      freq: draft.freq,
+      interval,
+      startDate: draft.startDate,
+      endDate: draft.endDate,
+      dayOfMonth: draft.dayOfMonth,
+      weekday: draft.weekday,
+      monthOfYear: draft.monthOfYear,
+      note: draft.note.trim(),
+      tags: parseTags(draft.tagsText),
+      updatedAt: now,
+    };
+    await db.recurring.put(rule);
+    return rule;
+  }
+  const rule: RecurringRule = {
+    ...newRule(),
+    id: newId('rec-'),
+    title: draft.title.trim(),
+    type: draft.type,
+    amount,
+    categoryId: draft.categoryId,
+    accountId: draft.accountId,
+    freq: draft.freq,
+    interval,
+    startDate: draft.startDate,
+    endDate: draft.endDate,
+    dayOfMonth: draft.dayOfMonth,
+    weekday: draft.weekday,
+    monthOfYear: draft.monthOfYear,
+    note: draft.note.trim(),
+    tags: parseTags(draft.tagsText),
+    confirmedDates: [],
+    skippedDates: [],
+    archived: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.recurring.put(rule);
+  return rule;
+}
+
+/** 直接从一条已有账目生成规则（总览里「这笔要不要每月提醒」那个动作） */
+export async function createRuleFromTransaction(tx: Transaction): Promise<RecurringRule> {
+  const rule = ruleFromTransaction(tx, newId('rec-'));
+  // 已经记过的这一天不该再提醒一次，直接标成已确认
+  rule.confirmedDates = [tx.date];
+  await db.recurring.put(rule);
+  return rule;
+}
+
+/**
+ * 从一条日程生成周期账单。
+ *
+ * 只搬能确定的字段：标题、起始日（决定每月的哪一天）、备注、标签。
+ * 金额日程里没有，所以规则金额留 0，让用户到周期账单页去填 ——
+ * 猜一个金额比留空更糟：用户会以为记的是对的。
+ */
+export async function createRuleFromEvent(event: EventItem): Promise<RecurringRule> {
+  const rule = ruleFromEvent(event, newId('rec-'));
+  await db.recurring.put(rule);
+  return rule;
+}
+
+export async function deleteRule(id: string): Promise<void> {
+  await db.recurring.delete(id);
+}
+
+/** 归档 / 取消归档一条规则 */
+export async function setRuleArchived(id: string, archived: boolean): Promise<void> {
+  const rule = await db.recurring.get(id);
+  if (!rule) return;
+  rule.archived = archived;
+  rule.updatedAt = new Date().toISOString();
+  await db.recurring.put(rule);
+}
+
+/**
+ * 确认一条待确认账单：写进账本 + 在这一天打上「已确认」。
+ *
+ * 两件事放在一个事务里 —— 只写账目不标记，下次打开还会再提醒一遍；
+ * 只标记不写账，这笔账就永远丢了。中途出错必须一起回滚。
+ */
+export async function confirmBill(bill: PendingBill): Promise<Transaction> {
+  const draft = billToDraft(bill);
+  const now = new Date().toISOString();
+  const base = validateDraft(draft);
+  const tx: Transaction = { id: newId('tx-'), createdAt: now, updatedAt: now, ...base };
+  await db.transaction('rw', [db.transactions, db.recurring], async () => {
+    await db.transactions.add(tx);
+    const rule = await db.recurring.get(bill.rule.id);
+    if (rule) {
+      if (!rule.confirmedDates.includes(bill.date)) rule.confirmedDates = [...rule.confirmedDates, bill.date].sort();
+      rule.updatedAt = now;
+      await db.recurring.put(rule);
+    }
+  });
+  return tx;
+}
+
+/** 跳过一条待确认账单：不写账本，只记下这一天不用再提醒 */
+export async function skipBill(bill: PendingBill): Promise<void> {
+  const rule = await db.recurring.get(bill.rule.id);
+  if (!rule) return;
+  if (!rule.skippedDates.includes(bill.date)) rule.skippedDates = [...rule.skippedDates, bill.date].sort();
+  rule.updatedAt = new Date().toISOString();
+  await db.recurring.put(rule);
+}
+
+/** 当前所有待确认账单 */
+export async function listPendingBills(today: string): Promise<PendingBill[]> {
+  const rules = await db.recurring.toArray();
+  return pendingBills(rules, today);
+}
+
+/**
+ * 某条规则在某个区间里的出账日（详情页「接下来几次」用）。
+ * 这里不查库，交给调用方传规则，方便在测试里直接调。
+ */
+export function ruleDates(rule: RecurringRule, from: string, to: string): string[] {
+  return ruleDatesBetween(rule, from, to);
+}
+
+/* ---------------- 快捷记账模板（v0.8.0） ---------------- */
+
+export async function listQuickTemplates(): Promise<QuickTemplate[]> {
+  const all = await db.quick.toArray();
+  // 新存的排前面 —— 用户刚存完就想在列表顶部看见它
+  return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** 存一个模板；同名的会被替换掉（避免列表里堆一堆「午饭」） */
+export async function saveQuickTemplate(tx: Transaction, name: string): Promise<QuickTemplate> {
+  const tpl = templateFromTransaction(tx, name, newId('qt-'));
+  const all = await db.quick.toArray();
+  const next = upsertTemplate(all, tpl);
+  // 被替换掉的那些真的删掉，否则同名旧模板会一直留在库里
+  const keep = new Set(next.map((t) => t.id));
+  const drop = all.filter((t) => !keep.has(t.id)).map((t) => t.id);
+  await db.transaction('rw', db.quick, async () => {
+    if (drop.length) await db.quick.bulkDelete(drop);
+    await db.quick.put(tpl);
+  });
+  return tpl;
+}
+
+export async function deleteQuickTemplate(id: string): Promise<void> {
+  await db.quick.delete(id);
+}
+
+/**
+ * 记完一笔后自动问「要不要每月提醒」的触发条件。
+ *
+ * 为什么只对「支出 + 有备注 + 金额不小」问：
+ *   如果每记一笔都弹一句，它就从「贴心的提示」变成了「烦人的弹窗」。
+ *   房租、话费、会员这类固定支出有三个特征：是支出、备注写了是什么、
+ *   金额比零钱大。三个都满足才值得问一句。
+ */
+export function shouldOfferRecurring(tx: Transaction): boolean {
+  // 门槛定在 100 元：30 块的一顿午饭不该被问「要不要每月提醒」，
+  // 但房租、宽带、会员年费这类一定过线。宁可不问，也别问得让人烦。
+  return tx.type === 'expense' && tx.note.trim().length > 0 && tx.amount >= 10000;
 }

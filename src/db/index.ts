@@ -1,7 +1,9 @@
 import Dexie, { type Table } from 'dexie';
 import type { Account, Budget, Category, Settings, Transaction } from '../domain/model';
+import type { RecurringRule } from '../domain/recurring';
 import type { EventItem } from '../domain/schedule';
 import type { Course } from '../domain/timetable';
+import type { QuickTemplate } from '../domain/quick';
 
 /**
  * 本地数据库（IndexedDB）。
@@ -16,6 +18,8 @@ export class LedgerDB extends Dexie {
   settings!: Table<Settings, string>;
   events!: Table<EventItem, string>;
   courses!: Table<Course, string>;
+  recurring!: Table<RecurringRule, string>;
+  quick!: Table<QuickTemplate, string>;
 
   constructor(name = 'yichen-ledger') {
     super(name);
@@ -48,6 +52,32 @@ export class LedgerDB extends Dexie {
       settings: 'key',
       events: 'id, date, done',
       courses: 'id, name',
+    });
+    // v4 加周期账单。还是只加表不改表 —— 老用户的账目一条不动。
+    // 索引只留 type 和 archived：规则最多几十条，全表读出来在内存里筛更快，
+    // 不需要为 freq / startDate 建索引。
+    this.version(4).stores({
+      accounts: 'id, kind, archived, sort',
+      categories: 'id, type, sort',
+      transactions: 'id, date, type, categoryId, accountId, toAccountId',
+      budgets: 'id, categoryId, month',
+      settings: 'key',
+      events: 'id, date, done',
+      courses: 'id, name',
+      recurring: 'id, type, archived',
+    });
+    // v5 加「快捷记账模板」。依旧只加表：老用户的数据一条不动。
+    // 模板只有几条，不建索引也行，但主键 id 必须留着（Dexie 要求有主键）。
+    this.version(5).stores({
+      accounts: 'id, kind, archived, sort',
+      categories: 'id, type, sort',
+      transactions: 'id, date, type, categoryId, accountId, toAccountId',
+      budgets: 'id, categoryId, month',
+      settings: 'key',
+      events: 'id, date, done',
+      courses: 'id, name',
+      recurring: 'id, type, archived',
+      quick: 'id, name',
     });
   }
 }
