@@ -37,7 +37,7 @@ try {
   await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 60000 });
   const loadMs = Date.now() - t0;
 
-  check(await page.title() === '忆笺记账', '标题正确', await page.title());
+  check(await page.title() === '忆笺', '标题正确', await page.title());
   check(loadMs < 20000, '首屏加载时间合理', `${loadMs}ms`);
 
   await page.waitForSelector('.networth', { timeout: 20000 });

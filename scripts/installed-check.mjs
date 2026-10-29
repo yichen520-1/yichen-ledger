@@ -57,7 +57,7 @@ function candidatePaths() {
   } else if (process.platform === 'darwin') {
     out.push({
       label: 'macOS 安装版',
-      asar: path.join('/Applications', '忆笺记账.app', 'Contents', 'Resources', 'app.asar'),
+      asar: path.join('/Applications', '忆笺.app', 'Contents', 'Resources', 'app.asar'),
     });
   }
   return out;

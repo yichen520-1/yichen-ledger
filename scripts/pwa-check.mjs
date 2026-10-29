@@ -52,7 +52,7 @@ try {
   if (manifest) {
     const j = manifest.json;
     check('manifest display 是 standalone', j.display === 'standalone', j.display);
-    check('manifest name 是中文应用名', j.name === '忆笺记账', j.name);
+    check('manifest name 是中文应用名', j.name === '忆笺', j.name);
     const sizes = (j.icons ?? []).map((i) => i.sizes);
     check('manifest 含 192 与 512 图标', sizes.includes('192x192') && sizes.includes('512x512'), sizes.join(','));
     check('manifest 有 maskable 图标', (j.icons ?? []).some((i) => i.purpose === 'maskable'));
