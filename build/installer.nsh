@@ -1,4 +1,4 @@
-# Custom NSIS script for 忆尘记账 / yichen-ledger.
+# Custom NSIS script for 忆笺记账 / yichen-ledger.
 #
 # electron-builder includes this file automatically (buildResources/installer.nsh).
 #
