@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import { Sheet } from '../components/Sheet';
 import { deleteCategory, saveCategory } from '../db/repository';
 import { newId, type Category } from '../domain/model';
+import { BackButton } from '../components/BackButton';
 
 const COLORS = ['#ef6f4d', '#e0a83a', '#69a84f', '#3aa7a0', '#4a90d9', '#8a7cd6', '#c96fb7', '#d95f6c', '#8d8d8d'];
 const ICONS = ['🍜', '🥬', '🚌', '🛍️', '🏠', '💡', '📱', '🎮', '💊', '📚', '🎁', '🐾', '✈️', '💰', '🧧', '🏷️', '☕', '🎧'];
@@ -59,6 +60,7 @@ export default function Categories() {
   return (
     <>
       <div className="page-head">
+        <BackButton />
         <div>
           <h1 className="page-title">{t('categories.title')}</h1>
           <div className="page-sub">{t('categories.sub')}</div>

@@ -14,6 +14,7 @@ import {
   type TxFilter,
 } from '../domain/search';
 import { formatCents, shiftMonth, currentMonthKey, toDateKey, type TxType } from '../domain/model';
+import { BackButton } from '../components/BackButton';
 
 /**
  * 搜索与筛选
@@ -90,6 +91,7 @@ export default function SearchPage() {
   return (
     <>
       <div className="page-head">
+        <BackButton />
         <div>
           <h1 className="page-title">{t('search.title')}</h1>
           <div className="page-sub">{t('search.sub')}</div>

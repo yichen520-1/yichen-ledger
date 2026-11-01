@@ -6,6 +6,7 @@ import { Sheet } from '../components/Sheet';
 import { formatCents, toDateKey } from '../domain/model';
 import { openReceivables, receivableTotal } from '../domain/receivable';
 import { settleReceivable, unsettleReceivable } from '../db/repository';
+import { BackButton } from '../components/BackButton';
 
 /**
  * 待收的钱
@@ -72,6 +73,7 @@ export default function Receivables() {
   return (
     <>
       <div className="page-head">
+        <BackButton />
         <div>
           <h1 className="page-title">{t('receivable.listTitle')}</h1>
           <div className="page-sub">

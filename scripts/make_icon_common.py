@@ -623,27 +623,23 @@ def draw_icon(size: int = SIZE, *, full_bleed: bool = False, transparent: bool =
 
     full_bleed=True  铺满整块画布，不切圆角 —— 给 Android 用
                      （Android 8+ 的 adaptive icon 会自己裁形状，圆角底板会露黑边）。
-    transparent=True 只留字和印，底板透明 —— 给 adaptive icon 的前景层。
+    transparent=True 同一幅画，但底板透明 —— 给 adaptive icon 的前景层。
 
     默认（两者都 False）是带圆角的整块图标，给 Windows / macOS / iOS / PWA 用。
+
+    为什么前景层也要画山和鸟（v0.9.1 改）
+    ------------------------------------------------------------------
+    原来 transparent=True 只画「忆」和那枚印，理由是「山会跟底板撞在一起」。
+    但 Android 8+ 的 adaptive icon 是「背景层（纯宣纸色）+ 前景层」叠出来的，
+    前景层把山去掉之后，手机上看到的就是一块白底加一个字 —— 用户报的
+    「手机图标和电脑端不一样」正是这个。底板本来就是同一张宣纸的色，
+    山画在上面根本不会撞，反而是少了山才不像同一张图。
+    所以现在两层的画法完全一致，只差底板透不透明。
     """
     if transparent:
-        # 前景层：山会跟底板撞在一起，去掉；只留「忆」和那枚印。
         img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        # 字往左上让一点，把右下角腾给印章：前景层是抠空的，
-        # 印章一旦压在「忆」的末笔上，两层颜色叠起来就糊成一团红。
-        glyph = _ink_layer(
-            size, "忆", ratio=0.58, color=INK, dx=-0.052, dy=-0.068,
-            seed=17, wet=0.55, dry=0.34, font_path=BRUSH_XING,
-        )
-        img = Image.alpha_composite(img, glyph)
-        # 印章缩到字的六成、落在右下外角；位置留在 Android 的 66% 安全圆内
-        seal_px = int(size * 0.148)
-        seal = _seal(seal_px, style="zhuwen", angle=-3.2, scale=0.94)
-        img.alpha_composite(seal, (int(size * 0.545), int(size * 0.548)))
-        return img
-
-    img = _vignette(_paper(size, PAPER, seed=13), 0.24).convert("RGBA")
+    else:
+        img = _vignette(_paper(size, PAPER, seed=13), 0.24).convert("RGBA")
 
     # 远山三层，越近越浓 —— 这是山水画的「三远」叠法。
     # fade 不能太小，小了墨还没化开就没了，山会变成一条细线。
@@ -681,6 +677,10 @@ def draw_icon(size: int = SIZE, *, full_bleed: bool = False, transparent: bool =
     # 印章用朱文（红框红字）：白文的实心红块在这个尺寸下太抢眼，会压住山。
     img.alpha_composite(_seal(size, style="zhuwen", angle=-3.2, scale=0.252),
                         (int(size * 0.656), int(size * 0.624)))
+
+    # 前景层到这里就是成品：画完了，只是底板是透明的
+    if transparent:
+        return img
 
     if full_bleed:
         # 圆角换直角：把四角露出来的透明补成纸色

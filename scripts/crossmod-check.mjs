@@ -163,7 +163,7 @@ try {
   await sleep(500);
   check('周期账单空态', (await page.$('.empty')) !== null);
   await page.evaluate(() => {
-    const btn = [...document.querySelectorAll('.page-actions button, .page-head button')].find((b) =>
+    const btn = [...document.querySelectorAll('.page-actions button, .page-head button:not(.back-btn)')].find((b) =>
       /新建|添加/.test(b.textContent),
     );
     if (btn) btn.click();

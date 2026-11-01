@@ -12,6 +12,9 @@ import {
   Sparkles,
   HandCoins,
   Settings2,
+  MoreHorizontal,
+  X,
+  Tag,
   Target,
   Wallet,
 } from 'lucide-react';
@@ -63,6 +66,24 @@ const EXTRA: Array<{ to: string; label: DictKey; icon: typeof Search }> = [
   { to: '/receivables', label: 'nav.receivable', icon: HandCoins },
 ];
 
+/**
+ * 手机端「更多」抽屉里的条目
+ * ------------------------------------------------------------------
+ * 顺序按「多久用一次」排：账户和分类是整理类，放前面；
+ * 搜索和周期账单是查类；周报、回顾、待收是回看类；设置最后。
+ * 桌面端不用这个数组 —— 那里这些都在侧边栏里。
+ */
+const MORE_ITEMS: Array<{ to: string; label: DictKey; icon: typeof Search }> = [
+  { to: '/accounts', label: 'nav.accounts', icon: Wallet },
+  { to: '/categories', label: 'nav.categories', icon: Tag },
+  { to: '/search', label: 'nav.search', icon: Search },
+  { to: '/recurring', label: 'nav.recurring', icon: Repeat },
+  { to: '/weekly', label: 'nav.weekly', icon: CalendarRange },
+  { to: '/review', label: 'nav.review', icon: Sparkles },
+  { to: '/receivables', label: 'nav.receivable', icon: HandCoins },
+  { to: '/settings', label: 'nav.settings', icon: Settings2 },
+];
+
 /** 日程模式下的导航只有两项，直接在 JSX 里写，不走 NAV 数组 */
 
 /**
@@ -100,6 +121,15 @@ function Shell() {
   const isSchedule = mode === 'schedule';
 
   /**
+   * 手机端的「更多」抽屉
+   * ------------------------------------------------------------------
+   * 手机上侧边栏不存在，搜索 / 周期账单 / 周报 / 回顾 / 待收 / 账户 / 分类
+   * 这几页原本根本进不去。底部导航只有 5 格，塞不下 8 个入口，
+   * 所以第 5 格做成抽屉：点开是一张玻璃卡片，列所有次级页面。
+   */
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  /**
    * 忆小尘的入口放在哪几页
    * ------------------------------------------------------------------
    * 只放三页：总览、统计（管钱），日程（管时间）。
@@ -108,6 +138,11 @@ function Shell() {
    */
   const showFab =
     ready && (location.pathname === '/' || location.pathname === '/stats' || location.pathname === '/schedule');
+
+  // 换页就收起抽屉，否则点完还浮在下面
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [location.pathname]);
 
   // 判断方向：新页面在导航顺序里更靠后 → 从右推入（forward），否则从左（back）
   const index = ORDER.indexOf(location.pathname);
@@ -278,6 +313,34 @@ function Shell() {
         />
       ) : null}
 
+      {/* 手机端的「更多」抽屉。桌面端有侧边栏，永远不出现。 */}
+      {moreOpen && !isAdd ? (
+        <>
+          <div className="more-mask" onClick={() => setMoreOpen(false)} aria-hidden="true" />
+          <div className="more-sheet" role="menu">
+            <div className="more-head">
+              <span>{t('nav.more')}</span>
+              <button className="more-close" onClick={() => setMoreOpen(false)} aria-label={t('common.close')}>
+                <X size={17} />
+              </button>
+            </div>
+            <div className="more-grid">
+              {MORE_ITEMS.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => `more-item${isActive ? ' active' : ''}`}
+                  onClick={() => setMoreOpen(false)}
+                >
+                  <item.icon size={19} />
+                  <span>{t(item.label)}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
+
       {!isAdd ? (
         <nav className="tabbar has-backdrop">
           <Backdrop region="tabbar" />
@@ -317,10 +380,15 @@ function Shell() {
                   <Target size={20} />
                   {t('nav.budgets')}
                 </NavLink>
-                <NavLink to="/settings" className={({ isActive }) => `tab${isActive ? ' active' : ''}`}>
-                  <Settings2 size={20} />
-                  {t('nav.settings')}
-                </NavLink>
+                <button
+                  className={`tab${moreOpen ? ' active' : ''}`}
+                  onClick={() => setMoreOpen((v) => !v)}
+                  aria-label={t('nav.more')}
+                  aria-expanded={moreOpen}
+                >
+                  <MoreHorizontal size={20} />
+                  {t('nav.more')}
+                </button>
               </>
             )}
             {/* 手机上只剩一枚「去另一个 App」的图标 —— 见 components/AppRail.tsx */}

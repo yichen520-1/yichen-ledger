@@ -6,6 +6,7 @@ import { useI18n } from '../i18n';
 import { formatCents, monthTotals, shiftMonth, currentMonthKey, monthKeyOf } from '../domain/model';
 import { monthHeat, reviewFacts, reviewPlainText } from '../domain/annual';
 import { fixedTotals } from '../domain/recurring';
+import { BackButton } from '../components/BackButton';
 
 /**
  * 月度回顾
@@ -62,6 +63,7 @@ export default function Review() {
   return (
     <>
       <div className="page-head">
+        <BackButton />
         <div>
           <h1 className="page-title">{t('review.title')}</h1>
           <div className="page-sub">{t('review.sub')}</div>

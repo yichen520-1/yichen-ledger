@@ -15,6 +15,7 @@ import {
   type RecurringRule,
 } from '../domain/recurring';
 import { formatCents, toDateKey, type TxType } from '../domain/model';
+import { BackButton } from '../components/BackButton';
 
 /**
  * 周期账单
@@ -201,6 +202,7 @@ export default function Recurring() {
   return (
     <>
       <div className="page-head">
+        <BackButton />
         <div>
           <h1 className="page-title">{t('recurring.title')}</h1>
           <div className="page-sub">{t('recurring.sub')}</div>

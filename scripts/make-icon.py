@@ -58,13 +58,16 @@ def main() -> None:
             mask = mask.resize((px, px), Image.LANCZOS)
             round_icon.paste(draw_icon(px, full_bleed=True), (0, 0), mask)
             round_icon.save(target / "ic_launcher_round.png")
-            # 前景层：108dp 画布里内容只占中间约 61%，四周留白给系统做各种形状的遮罩
+            # 前景层：108dp 画布，整幅画铺满，让系统的遮罩去裁。
+            #
+            # 这里原来只把画缩到中间的 62%（所谓「安全区」写法）。那是给
+            # 「一个 logo 摆在圆圈中间」的图标用的；我们这张是整幅山水，
+            # 缩到 62% 之后，山脚会停在画布 81% 的位置，系统一裁圆，
+            # 圆的下缘就露出一条硬邦邦的直边 —— 像图标被切了一刀。
+            # 改成铺满：任何遮罩（圆、方圆、圆角方）都只是把山水裁掉一圈，
+            # 和桌面版那张方图看起来是同一幅画。
             fg_px = int(px * 108 / 48)
-            canvas = Image.new("RGBA", (fg_px, fg_px), (0, 0, 0, 0))
-            inner = draw_icon(int(fg_px * 0.62), transparent=True)
-            off = (fg_px - inner.width) // 2
-            canvas.alpha_composite(inner, (off, off))
-            canvas.save(target / "ic_launcher_foreground.png")
+            draw_icon(fg_px, transparent=True).save(target / "ic_launcher_foreground.png")
         print(f"wrote Android launcher icons to {android_res}")
     else:
         print("skip Android icons: android/ not present")

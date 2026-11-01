@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import { Sheet } from '../components/Sheet';
 import { deleteAccount, saveAccount } from '../db/repository';
 import { accountBalance, formatCents, newId, parseAmountToCents, type Account, type AccountKind } from '../domain/model';
+import { BackButton } from '../components/BackButton';
 
 const ICON: Record<AccountKind, string> = {
   cash: '💵',
@@ -104,6 +105,7 @@ export default function Accounts() {
   return (
     <>
       <div className="page-head">
+        <BackButton />
         <div>
           <h1 className="page-title">{t('accounts.title')}</h1>
           <div className="page-sub">{t('accounts.sub', { total: formatCents(total) })}</div>

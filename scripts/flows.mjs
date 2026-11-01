@@ -40,7 +40,7 @@ try {
   // ---------- 1. 新建预算 ----------
   await page.goto(`${URL_BASE}#/budgets`, { waitUntil: 'networkidle2' });
   await sleep(400);
-  const newBtn = await page.$$('.page-head button');
+  const newBtn = await page.$$('.page-head button:not(.back-btn)');
   await newBtn[0].click();
   await page.waitForSelector('.sheet', { timeout: 5000 });
   await sleep(560); // 等入场动画结束，动画期间输入框还在屏幕外
@@ -77,7 +77,7 @@ try {
   // ---------- 3. 新建账户 ----------
   await page.goto(`${URL_BASE}#/accounts`, { waitUntil: 'networkidle2' });
   await sleep(400);
-  const addBtn = (await page.$$('.page-head button'))[0];
+  const addBtn = (await page.$$('.page-head button:not(.back-btn)'))[0];
   await addBtn.click();
   await page.waitForSelector('.sheet', { timeout: 5000 });
   await sleep(560); // 等入场动画结束，动画期间输入框还在屏幕外
@@ -143,7 +143,7 @@ try {
   // ---------- 5. 分类管理：新增分类 ----------
   await page.goto(`${URL_BASE}#/categories`, { waitUntil: 'networkidle2' });
   await sleep(400);
-  const catAdd = (await page.$$('.page-head button'))[0];
+  const catAdd = (await page.$$('.page-head button:not(.back-btn)'))[0];
   await catAdd.click();
   await page.waitForSelector('.sheet', { timeout: 5000 });
   await sleep(560); // 等入场动画结束，动画期间输入框还在屏幕外

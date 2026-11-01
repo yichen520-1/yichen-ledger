@@ -4531,6 +4531,160 @@ select.input {
 }
 
 
+/* ================================================================
+   v0.9.1：手机端的出口（返回按钮 + 更多抽屉）
+   ================================================================ */
+
+/*
+ * 返回按钮
+ * ------------------------------------------------------------------
+ * 只在页头左上出现。手机上侧边栏是 display:none，没有它就没有任何出口；
+ * 桌面端留着也不碍事 —— 键盘的 Backspace / 浏览器的后退都在，它只是更显眼。
+ */
+.back-btn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--text-dim);
+}
+
+.back-btn:hover {
+  color: var(--text);
+}
+
+/* 页头里带返回按钮时，标题块和它之间留一点距离 */
+.page-head > .back-btn + div {
+  margin-left: 2px;
+}
+
+/*
+ * 「更多」抽屉
+ * ------------------------------------------------------------------
+ * 从底部导航条那一格弹上来的一张玻璃卡，不是全屏抽屉：
+ * 全屏会让人以为换了一级页面，而这里只是「还有几个不常去的入口」。
+ */
+.more-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.42);
+  animation: more-fade var(--dur-fast) var(--ease-out-soft);
+}
+
+.more-sheet {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: calc(76px + var(--safe-b));
+  z-index: 61;
+  padding: 14px 14px 16px;
+  border-radius: 20px;
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-edge);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(var(--glass-blur-px)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-px)) saturate(var(--glass-saturate));
+  animation: more-rise var(--dur-base) var(--ease-out-soft);
+}
+
+.more-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: calc(12px * var(--font-scale, 1));
+  color: var(--text-faint);
+  letter-spacing: 0.08em;
+}
+
+.more-close {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: none;
+  background: var(--bg-elev-2);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.more-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.more-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px 4px;
+  border-radius: 14px;
+  background: var(--bg-elev-2);
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: calc(11.5px * var(--font-scale, 1));
+  text-align: center;
+  transition:
+    background var(--dur-fast) var(--ease-out-soft),
+    border-color var(--dur-fast) var(--ease-out-soft),
+    color var(--dur-fast) var(--ease-out-soft);
+}
+
+.more-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.more-item:hover {
+  background: var(--bg-elev);
+  color: var(--text);
+}
+
+.more-item.active {
+  background: var(--accent-soft);
+  border-color: rgba(255, 180, 84, 0.32);
+  color: var(--accent);
+}
+
+@keyframes more-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes more-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+/* 桌面端不显示抽屉（有侧边栏，不需要） */
+@media (min-width: 900px) {
+  .more-mask,
+  .more-sheet {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .more-mask,
+  .more-sheet {
+    animation: none;
+  }
+}
+
 /* 减少动态偏好：去掉所有弹跳 */
 @media (prefers-reduced-motion: reduce) {
   .assistant-panel,

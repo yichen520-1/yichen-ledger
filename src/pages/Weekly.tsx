@@ -16,6 +16,7 @@ import {
   weekStats,
 } from '../domain/weekly';
 import { fixedTotals } from '../domain/recurring';
+import { BackButton } from '../components/BackButton';
 
 /**
  * 周报
@@ -96,6 +97,7 @@ export default function Weekly() {
   return (
     <div className="page-swap">
       <div className="page-head">
+        <BackButton />
         <div>
           <h1 className="page-title">{t('weekly.title')}</h1>
           <p className="page-sub">{t('weekly.sub')}</p>

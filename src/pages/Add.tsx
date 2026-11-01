@@ -9,6 +9,7 @@ import { formatCents, parseAmountToCents, toDateKey, type TxType } from '../doma
 import { recentShapes } from '../domain/quick';
 import { createRuleFromTransaction, saveQuickTemplate, shouldOfferRecurring } from '../db/repository';
 import { ReceiptStrip } from '../components/ReceiptStrip';
+import { BackButton } from '../components/BackButton';
 
 /**
  * 键盘的四个功能键用固定的 ASCII 标记，显示时才翻译：
@@ -240,6 +241,7 @@ export default function Add() {
   return (
     <div className="add-page">
       <div className="page-head">
+        <BackButton />
         <div>
           <h1 className="page-title">
             {missing ? t('add.notFound') : editing ? t('add.titleEdit') : t('add.title')}
