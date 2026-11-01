@@ -24,6 +24,8 @@ export default function Budgets() {
   const [categoryId, setCategoryId] = useState<string>('');
   const [amountText, setAmountText] = useState('');
   const [scope, setScope] = useState<'month' | 'always'>('always');
+  // 结转：这个月没花完的额度留到下个月，超支的部分也一起带过去
+  const [rollover, setRollover] = useState(false);
 
   const statuses = useMemo(() => budgetStatus(budgets, transactions, month), [budgets, transactions, month]);
 
@@ -44,12 +46,14 @@ export default function Budgets() {
       categoryId: categoryId || null,
       amount,
       month: scope === 'month' ? month : null,
+      rollover,
       createdAt: new Date().toISOString(),
     };
     await saveBudget(budget);
     setOpen(false);
     setAmountText('');
     setCategoryId('');
+    setRollover(false);
     toast(t('budgets.added'));
   }
 
@@ -125,13 +129,26 @@ export default function Budgets() {
                     <div style={{ fontWeight: 500 }}>
                       {cat ? `${cat.icon} ${cat.name}` : `🌈 ${t('budgets.allBudget')}`}
                       {s.budget.month ? <span className="muted"> · {t('common.monthOnly')}</span> : null}
+                      {s.budget.rollover ? <span className="rollover-tag">{t('budgets.rollover')}</span> : null}
                     </div>
                     <div className="muted">
                       {t('budgets.used', {
                         spent: formatCents(s.spent),
-                        total: formatCents(s.budget.amount),
+                        total: formatCents(s.available),
                       })}
                     </div>
+                    {/*
+                      结转额度单独一行：它是「上个月剩下的」，和这个月的额度
+                      是两笔钱，混在一个数字里会让人以为预算突然变多了。
+                      负数也显示 —— 上个月超支的部分确实会压到这个月。
+                    */}
+                    {s.budget.rollover && s.carried !== 0 ? (
+                      <div className={`carried-line ${s.carried > 0 ? 'pos' : 'neg'}`}>
+                        {s.carried > 0
+                          ? t('budgets.carriedPos', { amount: formatCents(s.carried) })
+                          : t('budgets.carriedNeg', { amount: formatCents(-s.carried) })}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="mono" style={{ color, fontWeight: 700 }}>
                     {(s.ratio * 100).toFixed(0)}%
@@ -182,6 +199,13 @@ export default function Budgets() {
             <option value="month">{t('budgets.onlyMonth', { month })}</option>
           </select>
         </div>
+        <label className="check-row" style={{ marginTop: 14 }}>
+          <input type="checkbox" checked={rollover} onChange={(e) => setRollover(e.target.checked)} />
+          <span>
+            <span className="k">{t('budgets.rollover')}</span>
+            <span className="h">{t('budgets.rolloverHint')}</span>
+          </span>
+        </label>
         <div className="row" style={{ marginTop: 18 }}>
           <button className="btn grow" onClick={() => setOpen(false)}>
             {t('common.cancel')}

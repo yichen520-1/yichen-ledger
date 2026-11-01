@@ -16,6 +16,8 @@ import {
 } from '../domain/model';
 import type { Transaction } from '../domain/model';
 import { PendingBills } from '../components/PendingBills';
+import { Nudge, nudgeDisabled } from '../components/Nudge';
+import { excludedFromStats } from '../domain/receivable';
 import { Timeline } from '../components/Timeline';
 
 export default function Dashboard() {
@@ -23,6 +25,8 @@ export default function Dashboard() {
   const { t, lang, dict } = useI18n();
   const navigate = useNavigate();
   const month = currentMonthKey();
+  // 本月有多少钱被「待收 / 冲平」挡在统计外 —— 总览要解释这个差
+  const excluded = useMemo(() => excludedFromStats(transactions, month), [transactions, month]);
 
   /**
    * 「今天 / 昨天 / 10月27日 周二」
@@ -102,7 +106,22 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/*
+        忆小尘主动开口：只在真有值得说的事时出现。
+        放在待确认账单上面 —— 两者都可能提到账单，但这一条是「先说一句话」，
+        账单卡片是「让你动手」，顺序上先说话后动手。
+      */}
+      {!nudgeDisabled() ? <Nudge /> : null}
+
       <PendingBills />
+
+      {excluded > 0 ? (
+        <div className="excluded-note">
+          {t('receivable.excluded', { amount: formatCents(excluded) })}
+          <br />
+          {t('receivable.excludedHint')}
+        </div>
+      ) : null}
 
       <section className="card overview">
         <div className="networth-label">{t('dashboard.netWorth')}</div>

@@ -53,6 +53,28 @@ export interface Transaction {
   date: string;
   note: string;
   tags: string[];
+  /**
+   * 待收（v0.9.0）：垫付出去、之后能收回来的钱 —— 报销、退款、代付。
+   *
+   * 为什么要有这个标记：这笔钱确实离开了账户，但它不是「花掉」。
+   * 如果照常算进当月支出，那个月的生活成本会虚高几千块，
+   * 而真实的消费水平完全没变。所以统计口径里把它排除掉，
+   * 账户余额里照常扣（钱是真的出去了）。
+   */
+  receivable?: boolean;
+  /**
+   * 冲平关系（v0.9.0）：
+   *   - 待收的那笔支出，settledBy 指向冲平它收入记录的 id
+   *   - 冲平出来的那笔收入，receivableId 指向原始支出
+   * 两笔互相指，删除任意一笔时另一笔要跟着处理，不然账会平不了。
+   */
+  receivableId?: string | null;
+  settledBy?: string | null;
+  /**
+   * 关联日程（v0.9.0 事件账本）：这笔钱属于哪一件事。
+   * 用现有日程当「事件」，不新造概念 —— 「去趟杭州」本来就该是一条日程。
+   */
+  eventId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -65,6 +87,13 @@ export interface Budget {
   amount: number;
   /** 生效月份，YYYY-MM；为空表示长期有效 */
   month: string | null;
+  /**
+   * 额度结转（v0.9.0）：上月没用完的额度滚到本月，超支的负数也滚。
+   *
+   * 为什么默认关：结转一旦打开，一个月的账会牵动后面所有月份，
+   * 出问题时很难说清是哪个月算错了。想要的人自己开。
+   */
+  rollover?: boolean;
   createdAt: string;
 }
 
@@ -185,12 +214,27 @@ export function netWorth(accounts: Account[], txs: Transaction[]): number {
     .reduce((sum, a) => sum + accountBalance(a, txs), 0);
 }
 
-/** 某月收入 / 支出合计（转账不计入收支） */
+/**
+ * 这笔账算不算进「收支统计」。
+ *
+ * 两种不算：
+ *   1. 待收的支出（钱出去了但会回来）
+ *   2. 冲平出来的那笔收入（它只是把 1 的钱还回来，不是新收入）
+ *
+ * 注意：账户余额 / 净资产**不**用这个判断 —— 钱确实进出过账户，
+ * 那是余额层面的事实，和「这个月花了多少」是两回事。
+ */
+export function isStatistical(tx: Transaction): boolean {
+  return !tx.receivable && !tx.receivableId;
+}
+
+/** 某月收入 / 支出合计（转账不计入收支；待收及其冲平不计入） */
 export function monthTotals(txs: Transaction[], monthKey: string): { income: number; expense: number } {
   let income = 0;
   let expense = 0;
   for (const tx of txs) {
     if (monthKeyOf(tx.date) !== monthKey) continue;
+    if (!isStatistical(tx)) continue;
     if (tx.type === 'income') income += tx.amount;
     else if (tx.type === 'expense') expense += tx.amount;
   }
@@ -205,6 +249,7 @@ export function expenseByCategory(
   const map = new Map<string | null, number>();
   for (const tx of txs) {
     if (tx.type !== 'expense' || monthKeyOf(tx.date) !== monthKey) continue;
+    if (!isStatistical(tx)) continue;
     map.set(tx.categoryId, (map.get(tx.categoryId) ?? 0) + tx.amount);
   }
   return [...map.entries()]
@@ -230,7 +275,7 @@ export function monthlyTrend(
 /** 某天的支出合计（日历热力图用） */
 export function dailyExpense(txs: Transaction[], dateKey: string): number {
   return txs
-    .filter((tx) => tx.type === 'expense' && tx.date === dateKey)
+    .filter((tx) => tx.type === 'expense' && tx.date === dateKey && isStatistical(tx))
     .reduce((sum, tx) => sum + tx.amount, 0);
 }
 
@@ -238,8 +283,58 @@ export function dailyExpense(txs: Transaction[], dateKey: string): number {
 export interface BudgetStatus {
   budget: Budget;
   spent: number;
+  /** 上月滚过来的额度（分），正数是剩余额度，负数是上月超支 */
+  carried: number;
+  /** 本月真正可用的额度 = amount + carried */
+  available: number;
   ratio: number;
   over: boolean;
+}
+
+/**
+ * 算某个月的预算，含额度结转。
+ *
+ * 结转规则（只在 budget.rollover 打开时生效）：
+ *   本月可用 = 本月上限 + 上月结余
+ *   上月结余 = 上月可用 - 上月已用（可以是负数）
+ *
+ * 为什么只往回收 12 个月：
+ *   一年前的预算和今天已经没关系了。而且如果每月都结转，
+ *   往回算到天荒地老也不会收敛 —— 必须有个头。
+ *
+ * 为什么负数也滚：
+ *   只滚正数就成了「花超了当月清零、省下了攒着」，
+ *   那是把预算当提款机，不是计划。
+ */
+const ROLLOVER_LOOKBACK = 12;
+
+function spentOfCategory(
+  byCategory: Map<string | null, number>,
+  totalSpent: number,
+  categoryId: string | null,
+): number {
+  return categoryId === null ? totalSpent : byCategory.get(categoryId) ?? 0;
+}
+
+function carryInto(
+  budget: Budget,
+  txs: Transaction[],
+  monthKey: string,
+  depth: number,
+): number {
+  if (!budget.rollover || depth >= ROLLOVER_LOOKBACK) return 0;
+  const prevMonth = shiftMonth(monthKey, -1);
+  // 预算本身如果指定了生效月，只有那个月及以后才算
+  if (budget.month !== null && prevMonth < budget.month) return 0;
+
+  const byCategory = new Map(
+    expenseByCategory(txs, prevMonth).map((e) => [e.categoryId, e.amount]),
+  );
+  const totalSpent = [...byCategory.values()].reduce((a, b) => a + b, 0);
+  const prevSpent = spentOfCategory(byCategory, totalSpent, budget.categoryId);
+  const prevCarried = carryInto(budget, txs, prevMonth, depth + 1);
+  const prevAvailable = budget.amount + prevCarried;
+  return prevAvailable - prevSpent;
 }
 
 export function budgetStatus(
@@ -252,9 +347,11 @@ export function budgetStatus(
   return budgets
     .filter((b) => b.month === null || b.month === monthKey)
     .map((budget) => {
-      const spent = budget.categoryId === null ? totalSpent : byCategory.get(budget.categoryId) ?? 0;
-      const ratio = budget.amount > 0 ? spent / budget.amount : 0;
-      return { budget, spent, ratio, over: spent > budget.amount };
+      const spent = spentOfCategory(byCategory, totalSpent, budget.categoryId);
+      const carried = carryInto(budget, txs, monthKey, 0);
+      const available = budget.amount + carried;
+      const ratio = available > 0 ? spent / available : spent > 0 ? 1 : 0;
+      return { budget, spent, carried, available, ratio, over: spent > available };
     })
     .sort((a, b) => b.ratio - a.ratio);
 }

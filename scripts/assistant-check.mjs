@@ -63,15 +63,28 @@ try {
   check('设置页不显示入口', (await page.$('.assistant-fab')) === null);
 
   // 先记两笔，后面才好问
-  await page.goto(`${BASE}#/add`, { waitUntil: 'networkidle2' });
-  await sleep(600);
+  //
+  // 每次都要先回 `#/` 再进 `#/add`：同一个路由重复 goto 不会重新挂载组件，
+  // 上一次的金额会留在输入框里（实测 125 + 350 会变成 125350）。
+  // 进页面后还要等表单灌好数据，再点一次「清空」，两道保险。
   async function addTx(amount) {
+    await page.goto(`${BASE}#/`, { waitUntil: 'networkidle2' });
+    await sleep(300);
+    await page.goto(`${BASE}#/add`, { waitUntil: 'networkidle2' });
+    await page.waitForSelector('.keypad', { timeout: 15000 });
+    await sleep(900);
+    await page.evaluate(() => {
+      const b = [...document.querySelectorAll('.keypad button')].find((x) => x.textContent.trim() === '清空');
+      if (b) b.click();
+    });
+    await sleep(150);
     for (const ch of amount) {
       const btns = await page.$$('.keypad button');
       for (const b of btns) {
         const label = await b.evaluate((el) => el.textContent.trim());
         if (label === ch) {
           await b.click();
+          await sleep(100);
           break;
         }
       }
@@ -83,8 +96,6 @@ try {
     await sleep(900);
   }
   await addTx('125');
-  await page.goto(`${BASE}#/add`, { waitUntil: 'networkidle2' });
-  await sleep(600);
   await addTx('350');
   await page.goto(`${BASE}#/`, { waitUntil: 'networkidle2' });
   await sleep(700);

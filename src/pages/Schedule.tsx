@@ -15,6 +15,7 @@ import {
 import { Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { createRuleFromEvent } from '../db/repository';
+import { eventSpend } from '../domain/receivable';
 import { useI18n, useErrorText } from '../i18n';
 import { useLedger } from '../state/LedgerContext';
 import {
@@ -38,7 +39,8 @@ import {
   type RecurFreq,
   type Recurrence,
 } from '../domain/schedule';
-import { toDateKey } from '../domain/model';
+import { formatCents, toDateKey } from '../domain/model';
+import type { Category, Transaction } from '../domain/model';
 import { rescheduleAll, ensureNotifyPermission, notifySupport } from '../state/notify';
 import { OcrDialog } from './schedule/OcrDialog';
 
@@ -428,6 +430,70 @@ function OccurrenceRow({
   );
 }
 
+/**
+ * 一场活动花了多少
+ *
+ * 只在「已经存下来的日程」上出现 —— 新建中的日程还没有 id，挂不上账目。
+ * 没有挂账目时整块隐藏：与其显示一个「¥0.00」让人以为记错了，
+ * 不如什么都不显示。
+ */
+function EventSpendBlock({
+  eventId,
+  transactions,
+  categoryOf,
+}: {
+  eventId: string;
+  transactions: Transaction[];
+  categoryOf: (id: string | null | undefined) => Category | undefined;
+}) {
+  const { t } = useI18n();
+  const spend = eventSpend(transactions, eventId);
+  if (spend.count === 0) return null;
+  const list = transactions
+    .filter((tx) => tx.eventId === eventId)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 6);
+  return (
+    <div className="event-spend">
+      <div className="event-spend-head">
+        <span className="t">{t('event.spend')}</span>
+        <span className="s">{t('event.spendSub', { count: String(spend.count) })}</span>
+      </div>
+      <div className="event-spend-figures">
+        <div>
+          <div className="k">{t('event.expense')}</div>
+          <div className="v mono" style={{ color: 'var(--red)' }}>
+            {formatCents(spend.expense)}
+          </div>
+        </div>
+        <div>
+          <div className="k">{t('event.income')}</div>
+          <div className="v mono" style={{ color: 'var(--green)' }}>
+            {formatCents(spend.income)}
+          </div>
+        </div>
+        <div>
+          <div className="k">{t('event.net')}</div>
+          <div className="v mono">{formatCents(spend.net)}</div>
+        </div>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        {list.map((tx) => (
+          <div className="row" key={tx.id} style={{ padding: '4px 0', fontSize: 'calc(12px * var(--font-scale, 1))' }}>
+            <span className="grow muted">
+              {categoryOf(tx.categoryId)?.icon ?? '🧾'} {tx.note || categoryOf(tx.categoryId)?.name || t('common.uncategorized')}
+            </span>
+            <span className="mono" style={{ color: tx.type === 'income' ? 'var(--green)' : 'var(--text)' }}>
+              {tx.type === 'income' ? '+' : '-'}
+              {formatCents(tx.amount)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function EventSheet({
   open,
   initial,
@@ -464,6 +530,7 @@ function EventSheet({
   const [busy, setBusy] = useState(false);
   const [seeded, setSeeded] = useState(false);
   const [ruleDone, setRuleDone] = useState(false);
+  const { transactions, categoryOf } = useLedger();
 
   useEffect(() => {
     if (!open) {
@@ -725,6 +792,13 @@ function EventSheet({
           ))}
         </div>
       </div>
+
+      {/*
+        事件账本：这场活动一共花了多少。
+        出差、旅行这类花费散在交通/餐饮/住宿几个分类里，挂到同一场日程上
+        才能一次看全 —— 这正是「记账 + 日程」合成一个 App 才做得到的事。
+      */}
+      {initial ? <EventSpendBlock eventId={initial.id} transactions={transactions} categoryOf={categoryOf} /> : null}
 
       {/* 日程 → 周期账单：只有已保存的日程才给这个入口，新建中的日程还没 id */}
       {initial && !ruleDone ? (

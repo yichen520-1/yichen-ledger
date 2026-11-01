@@ -9,6 +9,8 @@ import {
   Plus,
   Repeat,
   Search,
+  Sparkles,
+  HandCoins,
   Settings2,
   Target,
   Wallet,
@@ -34,6 +36,9 @@ import Categories from './pages/Categories';
 import SearchPage from './pages/SearchPage';
 import Weekly from './pages/Weekly';
 import Recurring from './pages/Recurring';
+import Review from './pages/Review';
+import Receivables from './pages/Receivables';
+import { LockScreen, useLockConfig } from './components/LockScreen';
 import { ScheduleShell } from './pages/schedule/ScheduleShell';
 
 /** 导航项：标签在渲染时用 t() 取，这样切语言不需要重建数组 */
@@ -54,6 +59,8 @@ const EXTRA: Array<{ to: string; label: DictKey; icon: typeof Search }> = [
   { to: '/search', label: 'nav.search', icon: Search },
   { to: '/recurring', label: 'nav.recurring', icon: Repeat },
   { to: '/weekly', label: 'nav.weekly', icon: CalendarRange },
+  { to: '/review', label: 'nav.review', icon: Sparkles },
+  { to: '/receivables', label: 'nav.receivable', icon: HandCoins },
 ];
 
 /** 日程模式下的导航只有两项，直接在 JSX 里写，不走 NAV 数组 */
@@ -74,7 +81,8 @@ const ORDER = [
   '/search',
   '/recurring',
   '/weekly',
-  '/weekly',
+  '/review',
+  '/receivables',
   '/schedule',
   '/schedule/timetable',
 ];
@@ -250,6 +258,8 @@ function Shell() {
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/recurring" element={<Recurring />} />
                 <Route path="/weekly" element={<Weekly />} />
+                <Route path="/review" element={<Review />} />
+                <Route path="/receivables" element={<Receivables />} />
                 <Route path="/schedule" element={<ScheduleShell />} />
                 <Route path="/schedule/timetable" element={<ScheduleShell />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -322,12 +332,26 @@ function Shell() {
   );
 }
 
+/**
+ * 应用锁的门
+ * ------------------------------------------------------------------
+ * 位置很讲究：在 I18nProvider 里面（锁屏要翻译），
+ * 在 LedgerProvider **外面**（账本还没开始读之前就得拦住，
+ * 否则页面会先闪一下账目再盖上锁）。
+ */
+function LockGate({ children }: { children: React.ReactNode }) {
+  const { config, locked, unlock } = useLockConfig();
+  if (!config.enabled || !locked) return <>{children}</>;
+  return <LockScreen config={config} onUnlock={unlock} />;
+}
+
 export default function App() {
   return (
     <I18nProvider>
       <AppearanceProvider>
         <ToastProvider>
-          <LedgerProvider>
+          <LockGate>
+            <LedgerProvider>
             <ModeProvider>
               <AssistantProvider>
                 <AssistantHost>
@@ -336,6 +360,7 @@ export default function App() {
               </AssistantProvider>
             </ModeProvider>
           </LedgerProvider>
+          </LockGate>
         </ToastProvider>
       </AppearanceProvider>
     </I18nProvider>

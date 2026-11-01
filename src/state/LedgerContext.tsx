@@ -8,6 +8,8 @@ import { toDateKey } from '../domain/model';
 import type { EventItem } from '../domain/schedule';
 import { defaultTimetableMeta, type Course, type TimetableMeta } from '../domain/timetable';
 import type { QuickTemplate } from '../domain/quick';
+import type { Receipt } from '../domain/receipt';
+import { groupByTx } from '../domain/receipt';
 import { useI18n } from '../i18n';
 
 interface LedgerState {
@@ -27,6 +29,10 @@ interface LedgerState {
   pending: PendingBill[];
   /** 快捷记账模板（新的在前） */
   quickTemplates: QuickTemplate[];
+  /** 全部收据，按账目 id 分好组 */
+  receiptsByTx: Map<string, Receipt[]>;
+  /** 收据总张数（设置页显示占用） */
+  receiptCount: number;
   /** 课表的开学日期 / 总周数 / 节次时间表 */
   timetable: TimetableMeta;
   accountName: (id: string | null | undefined) => string;
@@ -65,6 +71,10 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
   const courses = useLiveQuery(() => db.courses.toArray());
   const rules = useLiveQuery(() => db.recurring.toArray());
   const quickRows = useLiveQuery(() => db.quick.toArray());
+  // 收据单独订阅：它可能是几十兆的 Blob，只在需要时读出来。
+  // 这里读的是「全部收据」—— 本地账本规模下（几百张）完全够用，
+  // 真要上万张再改成按需查询。
+  const receiptRows = useLiveQuery(() => db.receipts.toArray());
   // 课表设置只有一个键，但它是 JSON —— 和课程一起在这里订阅，
   // 这样课表页改了开学日期，别的页面（首页「今天几节课」）立刻跟着变。
   //
@@ -83,6 +93,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     courses === undefined ||
     rules === undefined ||
     quickRows === undefined ||
+    receiptRows === undefined ||
     metaRow === undefined;
   const ready = seeded && !loading;
 
@@ -123,6 +134,8 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
       // 放在 context 里而不是每个页面各算一遍，是因为总览和预算页都要用它。
       pending: pendingBills(rules ?? [], toDateKey(new Date())),
       quickTemplates: (quickRows ?? []).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      receiptsByTx: groupByTx(receiptRows ?? []),
+      receiptCount: (receiptRows ?? []).length,
       timetable,
       accountName: (id) => (id ? accMap.get(id) ?? t('common.deletedAccount') : ''),
       categoryOf: (id) => (id ? catMap.get(id) : undefined),
@@ -139,6 +152,7 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
     courses,
     rules,
     quickRows,
+    receiptRows,
     metaRow,
     t,
   ]);

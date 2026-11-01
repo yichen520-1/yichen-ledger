@@ -4,6 +4,7 @@ import type { RecurringRule } from '../domain/recurring';
 import type { EventItem } from '../domain/schedule';
 import type { Course } from '../domain/timetable';
 import type { QuickTemplate } from '../domain/quick';
+import type { Receipt } from '../domain/receipt';
 
 /**
  * 本地数据库（IndexedDB）。
@@ -20,6 +21,7 @@ export class LedgerDB extends Dexie {
   courses!: Table<Course, string>;
   recurring!: Table<RecurringRule, string>;
   quick!: Table<QuickTemplate, string>;
+  receipts!: Table<Receipt, string>;
 
   constructor(name = 'yichen-ledger') {
     super(name);
@@ -78,6 +80,27 @@ export class LedgerDB extends Dexie {
       courses: 'id, name',
       recurring: 'id, type, archived',
       quick: 'id, name',
+    });
+    // v6 加「收据附件」（v0.9.0）。还是只加表。
+    //
+    // 为什么收据单独一张表而不是塞进 Transaction：
+    //   一张账目可能有好几张照片（发票 + 小票 + 付款截图），塞进账目里
+    //   要么变成数组字段（Dexie 不索引，查询时全表扫），要么把账目撑得很大。
+    //   单独一张表，按 txId 建索引，删账目时按索引一次清干净。
+    //
+    // blob 是图片本体。IndexedDB 能直接存 Blob，不用转 base64 ——
+    //   转 base64 会让体积涨 33%，而且读出来还要解码一次。
+    this.version(6).stores({
+      accounts: 'id, kind, archived, sort',
+      categories: 'id, type, sort',
+      transactions: 'id, date, type, categoryId, accountId, toAccountId',
+      budgets: 'id, categoryId, month',
+      settings: 'key',
+      events: 'id, date, done',
+      courses: 'id, name',
+      recurring: 'id, type, archived',
+      quick: 'id, name',
+      receipts: 'id, txId',
     });
   }
 }

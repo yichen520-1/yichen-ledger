@@ -8,6 +8,7 @@ import { createTransaction, deleteTransaction, updateTransaction } from '../db/r
 import { formatCents, parseAmountToCents, toDateKey, type TxType } from '../domain/model';
 import { recentShapes } from '../domain/quick';
 import { createRuleFromTransaction, saveQuickTemplate, shouldOfferRecurring } from '../db/repository';
+import { ReceiptStrip } from '../components/ReceiptStrip';
 
 /**
  * 键盘的四个功能键用固定的 ASCII 标记，显示时才翻译：
@@ -21,7 +22,7 @@ export default function Add() {
   const toast = useToast();
   const { t } = useI18n();
   const errorText = useErrorText();
-  const { accounts, categories, transactions, quickTemplates, categoryOf, loading } = useLedger();
+  const { accounts, categories, transactions, events, quickTemplates, categoryOf, loading } = useLedger();
 
   const editing = id ? transactions.find((tx) => tx.id === id) : undefined;
 
@@ -36,6 +37,9 @@ export default function Add() {
   const [busy, setBusy] = useState(false);
   // 记完之后那条「要不要每月提醒」的提示：存下刚记的那笔，由用户点「好」或「不用」
   const [offerRule, setOfferRule] = useState<{ id: string; note: string; amount: number } | null>(null);
+  // v0.9.0：待收（报销 / 代付）与事件关联
+  const [receivable, setReceivable] = useState(false);
+  const [eventId, setEventId] = useState<string>('');
   // 编辑模式下，进页面时账目可能还在从 IndexedDB 读；读到之前不能算初始化完成
   const [formSeeded, setFormSeeded] = useState(false);
 
@@ -59,6 +63,8 @@ export default function Add() {
       setDate(editing.date);
       setNote(editing.note);
       setTagsText(editing.tags.join(' '));
+      setReceivable(Boolean(editing.receivable));
+      setEventId(editing.eventId ?? '');
     }
     setFormSeeded(true);
   }, [id, loading, editing, formSeeded]);
@@ -116,6 +122,8 @@ export default function Add() {
         date,
         note,
         tagsText,
+        receivable,
+        eventId: eventId || null,
       };
       if (editing) {
         await updateTransaction(editing.id, draft);
@@ -410,9 +418,52 @@ export default function Add() {
                 onChange={(e) => setTagsText(e.target.value)}
               />
             </div>
+
+            {/* 待收：替人垫付、等公司报销这类钱。它不算「这个月花了多少」，
+                但账户余额照常扣 —— 钱确实出去了。 */}
+            {type === 'expense' ? (
+              <label className="check-row">
+                <input type="checkbox" checked={receivable} onChange={(e) => setReceivable(e.target.checked)} />
+                <span>
+                  <span className="k">{t('receivable.mark')}</span>
+                  <span className="h">{t('receivable.markHint')}</span>
+                </span>
+              </label>
+            ) : null}
+
+            {/* 事件账本：把账挂到一场日程上，出差、旅行的花费就能一次看全 */}
+            {type !== 'transfer' && events.length > 0 ? (
+              <div className="field">
+                <label>{t('event.link')}</label>
+                <select value={eventId} onChange={(e) => setEventId(e.target.value)}>
+                  <option value="">{t('event.linkNone')}</option>
+                  {events
+                    .slice()
+                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .slice(0, 40)
+                    .map((ev) => (
+                      <option key={ev.id} value={ev.id}>
+                        {ev.date} · {ev.title}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            ) : null}
           </div>
 
           <div>
+            {/* 收据只对已经存下来的账目有意义 —— 新建时还没有 id 可以挂 */}
+            {editing ? (
+              <div style={{ marginBottom: 14 }}>
+                <div className="quick-head">
+                  <span className="k">{t('receipt.title')}</span>
+                  <span className="m" style={{ fontSize: 'calc(11px * var(--font-scale, 1))', color: 'var(--text-faint)' }}>
+                    {t('receipt.hint')}
+                  </span>
+                </div>
+                <ReceiptStrip txId={editing.id} editable />
+              </div>
+            ) : null}
             <div className="keypad">
               {KEYS.map((k) =>
                 k === 'OK' ? (

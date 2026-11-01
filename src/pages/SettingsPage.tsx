@@ -10,6 +10,10 @@ import {
   Upload,
 } from 'lucide-react';
 import { useLedger } from '../state/LedgerContext';
+import { Sheet } from '../components/Sheet';
+import { LockScreen, PinForm, useLockConfig } from '../components/LockScreen';
+import { formatCents } from '../domain/model';
+import { NUDGE_LAST_KEY } from '../domain/nudge';
 import { useI18n, useErrorText, type LangSetting } from '../i18n';
 import { useToast } from '../components/Toast';
 import {
@@ -103,7 +107,11 @@ function Slider({
 }
 
 export default function SettingsPage() {
-  const { accounts, transactions, categories, budgets } = useLedger();
+  const { accounts, transactions, categories, budgets, receiptCount, rules } = useLedger();
+  const { config: lock, save: saveLock } = useLockConfig();
+  const [pinOpen, setPinOpen] = useState(false);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [pinErr, setPinErr] = useState('');
   const toast = useToast();
   const { t, lang, setting, setLang } = useI18n();
   const errorText = useErrorText();
@@ -159,6 +167,43 @@ export default function SettingsPage() {
   function changeStartup(v: Startup) {
     setStartup(v);
     db.settings.put({ key: STARTUP_KEY, value: v }).catch(() => undefined);
+  }
+
+  /* ---------------- 应用锁 ---------------- */
+
+  function toggleLock(next: boolean) {
+    if (!next) {
+      // 关闭前必须先验证一次 —— 否则谁拿到一台没锁的手机都能把锁关掉
+      setPinErr('');
+      setVerifyOpen(true);
+      return;
+    }
+    setPinErr('');
+    setPinOpen(true);
+  }
+
+  function onPinSet(hash: string) {
+    saveLock({ ...lock, enabled: true, hash });
+    setPinOpen(false);
+    toast(t('lock.pinSet'));
+  }
+
+  function onVerified() {
+    saveLock({ ...lock, enabled: false, hash: '' });
+    setVerifyOpen(false);
+    toast(t('lock.off'));
+  }
+
+  /* ---------------- 忆小尘开口 ---------------- */
+
+  function resetNudge() {
+    try {
+      localStorage.removeItem(NUDGE_LAST_KEY);
+      localStorage.removeItem('nudge.off');
+    } catch {
+      /* ignore */
+    }
+    toast(t('settings.nudgeResetDone'));
   }
 
   async function doExportBackup() {
@@ -555,6 +600,55 @@ export default function SettingsPage() {
         />
       </section>
 
+      {/* ---------- 应用锁 ---------- */}
+      <div className="section-title">{t('lock.title')}</div>
+      <section className="card">
+        <Row name={t('lock.enable')} hint={t('lock.enableHint')}>
+          <input
+            type="checkbox"
+            className="switch"
+            checked={lock.enabled}
+            onChange={(e) => toggleLock(e.target.checked)}
+          />
+        </Row>
+        {lock.enabled ? (
+          <>
+            <Row name={t('lock.grace')}>
+              <select
+                className="set-select"
+                value={String(lock.graceMinutes)}
+                onChange={(e) => saveLock({ ...lock, graceMinutes: Number(e.target.value) })}
+              >
+                <option value="0">{t('lock.grace0')}</option>
+                <option value="1">{t('lock.grace1')}</option>
+                <option value="5">{t('lock.grace5')}</option>
+                <option value="30">{t('lock.grace30')}</option>
+              </select>
+            </Row>
+            <button className="btn block" style={{ marginTop: 10 }} onClick={() => setPinOpen(true)}>
+              {t('lock.setPin')}
+            </button>
+          </>
+        ) : null}
+        {/*
+          这段话必须写出来，而且不能只写在文档里。
+          用户以为「有密码 = 加密」，这里要明确告诉他不是。
+        */}
+        <div className="muted" style={{ marginTop: 12, lineHeight: 1.68, fontSize: 'calc(11px * var(--font-scale, 1))' }}>
+          {t('lock.note')}
+        </div>
+      </section>
+
+      {/* ---------- 忆小尘 ---------- */}
+      <div className="section-title">{t('assistant.name')}</div>
+      <section className="card">
+        <Row name={t('settings.nudgeReset')} hint={t('settings.nudgeResetHint')}>
+          <button className="btn tiny" onClick={resetNudge}>
+            {t('settings.nudgeResetBtn')}
+          </button>
+        </Row>
+      </section>
+
       {/* ---------- 数据 ---------- */}
       <div className="section-title">{t('settings.groupData')}</div>
 
@@ -586,6 +680,14 @@ export default function SettingsPage() {
             <div className="muted">{t('settings.budgets')}</div>
             <div className="stat-num">{budgets.length}</div>
           </div>
+          <div className="grow">
+            <div className="muted">{t('receipt.title')}</div>
+            <div className="stat-num">{receiptCount}</div>
+          </div>
+        </div>
+        <div className="muted" style={{ marginTop: 10, fontSize: 'calc(11px * var(--font-scale, 1))' }}>
+          {t('recurring.fixedExpense')}: {formatCents(rules.filter((r) => !r.archived).length)} ·{' '}
+          {t('receipt.hint')}
         </div>
       </section>
 
@@ -741,6 +843,24 @@ export default function SettingsPage() {
           </span>
         </div>
       </section>
+
+      <Sheet open={pinOpen} onClose={() => setPinOpen(false)} title={t('lock.setPin')}>
+        <PinForm onDone={onPinSet} onCancel={() => setPinOpen(false)} />
+      </Sheet>
+
+      <Sheet open={verifyOpen} onClose={() => setVerifyOpen(false)} title={t('lock.turnOff')}>
+        <div className="muted" style={{ marginBottom: 12, lineHeight: 1.6 }}>
+          {t('lock.turnOffHint')}
+        </div>
+        {lock.enabled ? (
+          <LockScreen config={lock} onUnlock={onVerified} />
+        ) : (
+          <button className="btn block" onClick={() => setVerifyOpen(false)}>
+            {t('common.close')}
+          </button>
+        )}
+        {pinErr ? <div className="alert">{pinErr}</div> : null}
+      </Sheet>
     </>
   );
 }

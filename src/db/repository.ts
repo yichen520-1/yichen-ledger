@@ -24,6 +24,8 @@ import {
   type RecurringRule,
 } from '../domain/recurring';
 import { templateFromTransaction, upsertTemplate, type QuickTemplate } from '../domain/quick';
+import { RECEIPT_MAX_PER_TX, checkReceiptFile, type Receipt } from '../domain/receipt';
+import { settlementDraft } from '../domain/receivable';
 import {
   clampWeek,
   defaultTimetableMeta,
@@ -43,6 +45,14 @@ export interface TransactionDraft {
   date: string;
   note: string;
   tagsText: string;
+  /**
+   * 待收（v0.9.0）。true 表示这笔钱还没回到自己账上 ——
+   * 典型场景：先垫付了同事的团建费，回头报销。
+   * 待收的账目不进「这个月花了多少」，但账户余额照常扣。
+   */
+  receivable?: boolean;
+  /** 挂在哪场日程上（事件账本）。出差、旅行这类事的花费散在好几个分类里。 */
+  eventId?: string | null;
 }
 
 /**
@@ -74,7 +84,12 @@ export type ErrorCode =
   | 'errors.courseTimeInvalid'
   | 'errors.ruleTitleRequired'
   | 'errors.ruleAmountInvalid'
-  | 'errors.ruleStartInvalid';
+  | 'errors.ruleStartInvalid'
+  | 'errors.receiptNotImage'
+  | 'errors.receiptTooLarge'
+  | 'errors.receiptLimit'
+  | 'errors.pinLength'
+  | 'errors.pinMismatch';
 
 export class ValidationError extends Error {
   readonly code: ErrorCode;
@@ -109,6 +124,9 @@ export function validateDraft(
     date: draft.date,
     note: draft.note.trim(),
     tags: parseTags(draft.tagsText),
+    // 待收只对支出有意义：收入没有「还没到账的收入」这种说法。
+    receivable: draft.type === 'expense' ? Boolean(draft.receivable) : false,
+    eventId: draft.eventId || null,
   };
 }
 
@@ -149,7 +167,13 @@ export async function updateTransaction(id: string, draft: TransactionDraft): Pr
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
-  await db.transactions.delete(id);
+  await db.transaction('rw', [db.transactions, db.receipts], async () => {
+    await db.transactions.delete(id);
+    // 账目删了，挂在它上面的照片就没用了。留着只会白占空间，
+    // 而且用户再也找不到入口去删。
+    const ids = (await db.receipts.where('txId').equals(id).toArray()).map((r) => r.id);
+    if (ids.length) await db.receipts.bulkDelete(ids);
+  });
 }
 
 export async function saveAccount(input: Omit<Account, 'createdAt'> & { createdAt?: string }): Promise<Account> {
@@ -276,7 +300,7 @@ export async function toggleEventDone(ev: EventItem, date: string): Promise<void
 
 /** 导出全部数据为 JSON（备份用） */
 export async function exportBackup(): Promise<string> {
-  const [accounts, categories, transactions, budgets, events, courses, recurring, quick, settings] = await Promise.all([
+  const [accounts, categories, transactions, budgets, events, courses, recurring, quick, receipts, settings] = await Promise.all([
     db.accounts.toArray(),
     db.categories.toArray(),
     db.transactions.toArray(),
@@ -285,14 +309,16 @@ export async function exportBackup(): Promise<string> {
     db.courses.toArray(),
     db.recurring.toArray(),
     db.quick.toArray(),
+    db.receipts.toArray(),
     db.settings.toArray(),
   ]);
   return JSON.stringify(
     {
       app: 'yichen-ledger',
-      // 备份格式版本：2 起多了 events 字段，3 起多了 courses，4 起多了 recurring，
-      // 5 起多了 quick（快捷记账模板）。老备份仍然能导入，缺的字段就当空。
-      version: 5,
+      // 备份格式版本：2 起多了 events，3 起多了 courses，4 起多了 recurring，
+      // 5 起多了 quick，6 起多了 receipts（收据附件）。
+      // 老备份仍然能导入，缺的字段就当空 —— 升级不会因为备份格式变而失败。
+      version: 6,
       exportedAt: new Date().toISOString(),
       accounts,
       categories,
@@ -302,6 +328,7 @@ export async function exportBackup(): Promise<string> {
       courses,
       recurring,
       quick,
+      receipts,
       // 设置也一起带走：主题、语言、AI 配置、课表开学日期都在这里。
       // 备份的本意是「换设备能接着用」，少了设置就得重配一遍。
       settings: settings.filter((s) => s.key !== 'ai.config'),
@@ -322,6 +349,7 @@ export async function importBackup(json: string): Promise<void> {
     courses?: Course[];
     recurring?: RecurringRule[];
     quick?: QuickTemplate[];
+    receipts?: Receipt[];
     settings?: Array<{ key: string; value: string }>;
   };
   if (!Array.isArray(data.accounts) || !Array.isArray(data.transactions)) {
@@ -329,7 +357,7 @@ export async function importBackup(json: string): Promise<void> {
   }
   await db.transaction(
     'rw',
-    [db.accounts, db.categories, db.transactions, db.budgets, db.events, db.courses, db.recurring, db.quick, db.settings],
+    [db.accounts, db.categories, db.transactions, db.budgets, db.events, db.courses, db.recurring, db.quick, db.receipts, db.settings],
     async () => {
       await Promise.all([
         db.accounts.clear(),
@@ -340,6 +368,7 @@ export async function importBackup(json: string): Promise<void> {
         db.courses.clear(),
         db.recurring.clear(),
         db.quick.clear(),
+        db.receipts.clear(),
       ]);
       await db.accounts.bulkPut(data.accounts ?? []);
       await db.categories.bulkPut(data.categories ?? []);
@@ -349,6 +378,7 @@ export async function importBackup(json: string): Promise<void> {
       await db.courses.bulkPut(data.courses ?? []);
       await db.recurring.bulkPut(data.recurring ?? []);
       await db.quick.bulkPut(data.quick ?? []);
+      await db.receipts.bulkPut(data.receipts ?? []);
       // 设置不清空：AI 的 API Key 是本机的，不该被一份别处导出的备份覆盖掉。
       for (const s of data.settings ?? []) {
         if (s?.key && s.key !== 'ai.config') await db.settings.put(s);
@@ -835,4 +865,94 @@ export function shouldOfferRecurring(tx: Transaction): boolean {
   // 门槛定在 100 元：30 块的一顿午饭不该被问「要不要每月提醒」，
   // 但房租、宽带、会员年费这类一定过线。宁可不问，也别问得让人烦。
   return tx.type === 'expense' && tx.note.trim().length > 0 && tx.amount >= 10000;
+}
+
+/* ---------------------------------------------------------------- 收据附件（v0.9.0） */
+
+/** 某笔账目的收据 */
+export async function listReceipts(txId: string): Promise<Receipt[]> {
+  const list = await db.receipts.where('txId').equals(txId).toArray();
+  return list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** 全部收据，列表页一次算好分组 */
+export async function listAllReceipts(): Promise<Receipt[]> {
+  return db.receipts.toArray();
+}
+
+/**
+ * 给一笔账目加一张收据。
+ *
+ * 校验放在这里而不是只在界面上做 —— 界面能被绕过（拖拽、粘贴、将来的 API），
+ * 数据层的规则必须自己守住。
+ */
+export async function addReceipt(txId: string, file: File): Promise<Receipt> {
+  const reject = checkReceiptFile(file);
+  if (reject === 'receipt.notImage') throw new ValidationError('errors.receiptNotImage');
+  if (reject === 'receipt.tooLarge') throw new ValidationError('errors.receiptTooLarge');
+  const count = await db.receipts.where('txId').equals(txId).count();
+  if (count >= RECEIPT_MAX_PER_TX) throw new ValidationError('errors.receiptLimit');
+  const receipt: Receipt = {
+    id: newId('rc-'),
+    txId,
+    blob: file,
+    mime: file.type,
+    name: file.name,
+    size: file.size,
+    createdAt: new Date().toISOString(),
+  };
+  await db.receipts.add(receipt);
+  return receipt;
+}
+
+export async function deleteReceipt(id: string): Promise<void> {
+  await db.receipts.delete(id);
+}
+
+/** 删账目时顺手把它的收据也清掉 —— 否则照片会一直占着空间 */
+export async function deleteReceiptsOf(txId: string): Promise<void> {
+  const ids = (await db.receipts.where('txId').equals(txId).toArray()).map((r) => r.id);
+  if (ids.length) await db.receipts.bulkDelete(ids);
+}
+
+/* ---------------------------------------------------------------- 待收 / 报销（v0.9.0） */
+
+/**
+ * 把一笔待收的支出标记成「已收回」。
+ *
+ * 做法不是把原支出改成 0，而是生成一笔金额相同的**收入**，
+ * 并让两条记录互相记住对方（receivableId / settledBy）。
+ * 这样：
+ *   - 原始支出还留在原地，账目时间线不会突然少一笔；
+ *   - 收入是它本来的性质，分类统计里不会出现负数；
+ *   - 冲平的收入不进「这个月花了多少」（isStatistical 会跳过），
+ *     所以当月支出统计不会被这笔钱虚增。
+ */
+export async function settleReceivable(
+  original: Transaction,
+  date: string,
+  note = '',
+): Promise<Transaction> {
+  const draft = settlementDraft(original, date, note);
+  const now = new Date().toISOString();
+  const settled: Transaction = {
+    id: newId('tx-'),
+    createdAt: now,
+    updatedAt: now,
+    ...draft,
+  };
+  await db.transaction('rw', [db.transactions], async () => {
+    await db.transactions.add(settled);
+    await db.transactions.update(original.id, { settledBy: settled.id, updatedAt: now });
+  });
+  return settled;
+}
+
+/** 撤销「已收回」：删掉冲平的那笔收入，原账目回到待收状态 */
+export async function unsettleReceivable(original: Transaction): Promise<void> {
+  const now = new Date().toISOString();
+  await db.transaction('rw', [db.transactions], async () => {
+    if (original.settledBy) await db.transactions.delete(original.settledBy);
+    await db.transactions.update(original.id, { settledBy: null, updatedAt: now });
+  });
 }
