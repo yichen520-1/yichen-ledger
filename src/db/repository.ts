@@ -1,4 +1,4 @@
-import { db, seedIfEmpty } from './index';
+import { db } from './index';
 import {
   newId,
   parseAmountToCents,
@@ -16,8 +16,6 @@ import { newEvent, type EventItem } from '../domain/schedule';
 import {
   billToDraft,
   newRule,
-  pendingBills,
-  ruleDatesBetween,
   ruleFromEvent,
   ruleFromTransaction,
   type PendingBill,
@@ -28,7 +26,6 @@ import { RECEIPT_MAX_PER_TX, checkReceiptFile, type Receipt } from '../domain/re
 import { settlementDraft } from '../domain/receivable';
 import {
   clampWeek,
-  defaultTimetableMeta,
   newCourse,
   type Course,
   type CourseSession,
@@ -36,7 +33,7 @@ import {
 } from '../domain/timetable';
 
 /** 新建账目时用户真正需要填的东西 */
-export interface TransactionDraft {
+interface TransactionDraft {
   type: TxType;
   amountText: string;
   categoryId: string | null;
@@ -62,7 +59,7 @@ export interface TransactionDraft {
  * 中文/英文/日文。把翻译留在界面层（useErrorText），数据层就不用关心
  * 用户在看哪种语言，也避免 en/ja 界面里突然冒出中文。
  */
-export type ErrorCode =
+type ErrorCode =
   | 'errors.amountInvalid'
   | 'errors.accountRequired'
   | 'errors.toAccountRequired'
@@ -91,7 +88,7 @@ export type ErrorCode =
   | 'errors.pinLength'
   | 'errors.pinMismatch';
 
-export class ValidationError extends Error {
+class ValidationError extends Error {
   readonly code: ErrorCode;
 
   constructor(code: ErrorCode) {
@@ -102,7 +99,7 @@ export class ValidationError extends Error {
 }
 
 /** 校验草稿，返回可入库的对象（不含 id / 时间戳） */
-export function validateDraft(
+function validateDraft(
   draft: TransactionDraft,
 ): Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> {
   const amount = parseAmountToCents(draft.amountText);
@@ -128,25 +125,6 @@ export function validateDraft(
     receivable: draft.type === 'expense' ? Boolean(draft.receivable) : false,
     eventId: draft.eventId || null,
   };
-}
-
-export async function initDb(): Promise<void> {
-  await seedIfEmpty();
-}
-
-export async function listAccounts(): Promise<Account[]> {
-  const all = await db.accounts.toArray();
-  return all.sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name, 'zh-CN'));
-}
-
-export async function listCategories(): Promise<Category[]> {
-  const all = await db.categories.toArray();
-  return all.sort((a, b) => a.type.localeCompare(b.type) || a.sort - b.sort);
-}
-
-export async function listTransactions(): Promise<Transaction[]> {
-  const all = await db.transactions.toArray();
-  return all.sort((a, b) => (a.date === b.date ? b.createdAt.localeCompare(a.createdAt) : b.date.localeCompare(a.date)));
 }
 
 export async function createTransaction(draft: TransactionDraft): Promise<Transaction> {
@@ -211,10 +189,6 @@ export async function deleteBudget(id: string): Promise<void> {
   await db.budgets.delete(id);
 }
 
-export async function listBudgets(): Promise<Budget[]> {
-  return db.budgets.toArray();
-}
-
 /* ---------------------------------------------------------------- 忆笺 · 日程 */
 
 /** 日程草稿：新建/编辑时表单填的东西 */
@@ -233,7 +207,7 @@ export interface EventDraft {
 }
 
 /** 校验日程草稿 */
-export function validateEventDraft(draft: EventDraft): void {
+function validateEventDraft(draft: EventDraft): void {
   if (!draft.title.trim()) throw new ValidationError('errors.eventTitleRequired');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) throw new ValidationError('errors.dateInvalid');
   if (!draft.allDay) {
@@ -241,10 +215,6 @@ export function validateEventDraft(draft: EventDraft): void {
     if (!/^\d{2}:\d{2}$/.test(draft.endTime)) throw new ValidationError('errors.timeInvalid');
     if (draft.endTime < draft.startTime) throw new ValidationError('errors.timeOrder');
   }
-}
-
-export async function listEvents(): Promise<EventItem[]> {
-  return db.events.toArray();
 }
 
 export async function createEvent(draft: EventDraft): Promise<EventItem> {
@@ -534,7 +504,7 @@ export interface CourseDraft {
 }
 
 /** 校验课表草稿 */
-export function validateCourseDraft(draft: CourseDraft): void {
+function validateCourseDraft(draft: CourseDraft): void {
   if (!draft.name.trim()) throw new ValidationError('errors.courseNameRequired');
   const sessions = (draft.sessions ?? []).filter((s) => s.weekday >= 1 && s.weekday <= 7);
   if (!sessions.length) throw new ValidationError('errors.courseSessionRequired');
@@ -551,11 +521,6 @@ export function validateCourseDraft(draft: CourseDraft): void {
       throw new ValidationError('errors.courseTimeInvalid');
     }
   }
-}
-
-export async function listCourses(): Promise<Course[]> {
-  const all = await db.courses.toArray();
-  return all.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
 }
 
 export async function createCourse(draft: CourseDraft): Promise<Course> {
@@ -600,28 +565,6 @@ export async function deleteCourse(id: string): Promise<void> {
 }
 
 /** 读课表设置；没存过就返回默认值（开学日 = 本周一） */
-export async function loadTimetableMeta(): Promise<TimetableMeta> {
-  const row = await db.settings.get(TIMETABLE_META_KEY);
-  // settings.value 是 unknown（同一张表还存语言、外观等），先确认是字符串
-  if (typeof row?.value !== 'string' || !row.value) return defaultTimetableMeta();
-  try {
-    const parsed = JSON.parse(row.value) as Partial<TimetableMeta>;
-    const fallback = defaultTimetableMeta();
-    const periods = Array.isArray(parsed.periods) && parsed.periods.length ? parsed.periods : fallback.periods;
-    return {
-      termStart: /^\d{4}-\d{2}-\d{2}$/.test(String(parsed.termStart)) ? String(parsed.termStart) : fallback.termStart,
-      totalWeeks: Math.max(1, Math.min(30, Number(parsed.totalWeeks) || fallback.totalWeeks)),
-      periods: periods
-        .filter((p) => p && Number.isFinite(Number(p.index)))
-        .map((p) => ({ index: Number(p.index), start: String(p.start), end: String(p.end) }))
-        .sort((a, b) => a.index - b.index),
-    };
-  } catch {
-    // 设置项坏了不该让整个课表页打不开 —— 退回默认值，用户重设一次即可。
-    return defaultTimetableMeta();
-  }
-}
-
 export async function saveTimetableMeta(meta: TimetableMeta): Promise<void> {
   const clean: TimetableMeta = {
     termStart: meta.termStart,
@@ -667,7 +610,7 @@ export interface RuleDraft {
 }
 
 /** 校验规则草稿 */
-export function validateRuleDraft(draft: RuleDraft): {
+function validateRuleDraft(draft: RuleDraft): {
   amount: number;
   interval: number;
 } {
@@ -680,15 +623,6 @@ export function validateRuleDraft(draft: RuleDraft): {
   if (!draft.categoryId) throw new ValidationError('errors.categoryRequired');
   const interval = Math.max(1, Math.min(99, Number(draft.intervalText) || 1));
   return { amount, interval };
-}
-
-export async function listRules(): Promise<RecurringRule[]> {
-  const all = await db.recurring.toArray();
-  // 没归档的排前面，然后按下次到期日由近到远
-  return all.sort((a, b) => {
-    if (a.archived !== b.archived) return a.archived ? 1 : -1;
-    return a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title, 'zh-CN');
-  });
 }
 
 export async function saveRule(draft: RuleDraft, id?: string): Promise<RecurringRule> {
@@ -813,26 +747,11 @@ export async function skipBill(bill: PendingBill): Promise<void> {
 }
 
 /** 当前所有待确认账单 */
-export async function listPendingBills(today: string): Promise<PendingBill[]> {
-  const rules = await db.recurring.toArray();
-  return pendingBills(rules, today);
-}
-
 /**
  * 某条规则在某个区间里的出账日（详情页「接下来几次」用）。
  * 这里不查库，交给调用方传规则，方便在测试里直接调。
  */
-export function ruleDates(rule: RecurringRule, from: string, to: string): string[] {
-  return ruleDatesBetween(rule, from, to);
-}
-
 /* ---------------- 快捷记账模板（v0.8.0） ---------------- */
-
-export async function listQuickTemplates(): Promise<QuickTemplate[]> {
-  const all = await db.quick.toArray();
-  // 新存的排前面 —— 用户刚存完就想在列表顶部看见它
-  return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
 
 /** 存一个模板；同名的会被替换掉（避免列表里堆一堆「午饭」） */
 export async function saveQuickTemplate(tx: Transaction, name: string): Promise<QuickTemplate> {
@@ -847,10 +766,6 @@ export async function saveQuickTemplate(tx: Transaction, name: string): Promise<
     await db.quick.put(tpl);
   });
   return tpl;
-}
-
-export async function deleteQuickTemplate(id: string): Promise<void> {
-  await db.quick.delete(id);
 }
 
 /**
@@ -870,16 +785,7 @@ export function shouldOfferRecurring(tx: Transaction): boolean {
 /* ---------------------------------------------------------------- 收据附件（v0.9.0） */
 
 /** 某笔账目的收据 */
-export async function listReceipts(txId: string): Promise<Receipt[]> {
-  const list = await db.receipts.where('txId').equals(txId).toArray();
-  return list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-}
-
 /** 全部收据，列表页一次算好分组 */
-export async function listAllReceipts(): Promise<Receipt[]> {
-  return db.receipts.toArray();
-}
-
 /**
  * 给一笔账目加一张收据。
  *
@@ -910,11 +816,6 @@ export async function deleteReceipt(id: string): Promise<void> {
 }
 
 /** 删账目时顺手把它的收据也清掉 —— 否则照片会一直占着空间 */
-export async function deleteReceiptsOf(txId: string): Promise<void> {
-  const ids = (await db.receipts.where('txId').equals(txId).toArray()).map((r) => r.id);
-  if (ids.length) await db.receipts.bulkDelete(ids);
-}
-
 /* ---------------------------------------------------------------- 待收 / 报销（v0.9.0） */
 
 /**

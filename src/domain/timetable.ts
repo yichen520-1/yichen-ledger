@@ -180,18 +180,9 @@ export function sessionWeeks(session: CourseSession, totalWeeks: number): number
 }
 
 /** 「1-16周 单周」这种人话的中间形态，界面层负责翻译 */
-export function weekSpanText(session: CourseSession): string {
-  return `${session.weekFrom}-${session.weekTo}|${session.parity}`;
-}
-
 /* ---------------------------------------------------------------- 网格 */
 
 /** 一个格子：星期几的第几节 */
-export interface CellRef {
-  weekday: number;
-  period: number;
-}
-
 export interface PlacedCourse {
   course: Course;
   session: CourseSession;
@@ -230,12 +221,6 @@ export function weekBlocks(courses: Course[], weekNo: number): PlacedCourse[] {
 }
 
 /** 某天（1=周一…7=周日）有几门课，日历上画点用 */
-export function countByWeekday(blocks: PlacedCourse[]): Map<number, number> {
-  const m = new Map<number, number>();
-  for (const b of blocks) m.set(b.weekday, (m.get(b.weekday) ?? 0) + 1);
-  return m;
-}
-
 /* ---------------------------------------------------------------- 时间 */
 
 /** 取若干节的起止时间：第 1 节到第 2 节 → ['08:00','09:40'] */

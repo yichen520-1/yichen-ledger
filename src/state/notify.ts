@@ -1,4 +1,4 @@
-import type { EventItem, Occurrence } from '../domain/schedule';
+import type { EventItem } from '../domain/schedule';
 import { expandRange, reminderTimes, addDays } from '../domain/schedule';
 import type { Course, TimetableMeta } from '../domain/timetable';
 import { courseOccurrences } from '../domain/timetable';
@@ -182,11 +182,6 @@ export async function rescheduleAll(
 /** 网页版用到的定时器句柄，重排时统一清掉 */
 const webTimers: number[] = [];
 
-export function clearWebTimers(): void {
-  for (const id of webTimers) window.clearTimeout(id);
-  webTimers.length = 0;
-}
-
 /* ---------------------------------------------------------------- 上课提醒 */
 
 /**
@@ -299,7 +294,3 @@ export async function rescheduleCourses(
 }
 
 /** 单条日程的下一次提醒时刻（列表里显示「明天 09:00 提醒」用） */
-export function nextReminderOf(occ: Occurrence): Date | null {
-  const times = reminderTimes(occ);
-  return times.length ? times[0] : null;
-}

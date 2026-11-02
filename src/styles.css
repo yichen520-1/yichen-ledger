@@ -50,7 +50,6 @@
   --glass-blur-px: 24px;
   --glass-saturate: 175%;
   --glass-sheen: rgba(255, 255, 255, 0.12);
-  --glass-sheen-2: rgba(255, 255, 255, 0.03);
   --glass-edge: rgba(255, 255, 255, 0.16);
   --glass-edge-soft: rgba(255, 255, 255, 0.09);
   --glass-hi: rgba(255, 255, 255, 0.2);
@@ -63,7 +62,6 @@
   /* 玻璃弹层用的浅遮罩：全黑会把玻璃压成一块黑玻璃 */
   --scrim-soft: rgba(6, 9, 14, 0.34);
   --toast-bg: rgba(38, 45, 56, 0.96);
-  --fab-bg: linear-gradient(160deg, #2a2013, #1a1f27 70%);
   --warn-text: #ffd9a8;
   --warn-title: #ffe0b6;
   --warn-body: #e5c9a4;
@@ -131,7 +129,6 @@
   --glass-fill-alpha: calc(0.9 - 0.2 * var(--glass-k));
   --glass-saturate: 150%;
   --glass-sheen: rgba(255, 255, 255, 0.72);
-  --glass-sheen-2: rgba(255, 255, 255, 0.3);
   --glass-edge: rgba(20, 28, 42, 0.1);
   --glass-edge-soft: rgba(20, 28, 42, 0.07);
   --glass-hi: rgba(255, 255, 255, 0.95);
@@ -141,7 +138,6 @@
 
   --scrim: rgba(18, 24, 34, 0.3);
   --toast-bg: rgba(255, 255, 255, 0.9);
-  --fab-bg: linear-gradient(160deg, #fff3e0, #f5f8fc 70%);
   --warn-text: #7a4a12;
   --warn-title: #8a5410;
   --warn-body: #6b5230;
@@ -2349,16 +2345,6 @@ select.input {
 }
 
 /* 页头右侧的「日程 / 课表」两个标签 */
-.sched-tabs {
-  display: flex;
-  gap: 3px;
-  padding: 3px;
-  border-radius: 11px;
-  background: var(--bg-elev-2);
-  border: 1px solid var(--line-soft);
-  flex: 0 0 auto;
-}
-
 .sched-tab {
   display: flex;
   align-items: center;
@@ -3994,18 +3980,6 @@ select.input {
   font-variant-numeric: tabular-nums;
   font-size: calc(14px * var(--font-scale, 1));
   color: var(--accent);
-}
-
-.badge-pending {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 6px;
-  border-radius: 5px;
-  font-size: calc(10px * var(--font-scale, 1));
-  background: rgba(255, 180, 84, 0.18);
-  color: var(--accent);
-  margin-left: 6px;
-  vertical-align: 1px;
 }
 
 .badge-settled {

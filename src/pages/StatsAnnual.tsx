@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLedger } from '../state/LedgerContext';
-import { useI18n, type DictKey } from '../i18n';
+import { useI18n } from '../i18n';
 import { currentYear, topDayOfYear, yearExpenseByCategory, yearStats } from '../domain/annual';
 import { formatCents, formatCentsCompact } from '../domain/model';
 
@@ -249,5 +249,3 @@ export default function StatsAnnual() {
   );
 }
 
-/** 导出给类型检查用：确认 DictKey 已覆盖 annual.* */
-export type AnnualKey = Extract<DictKey, `annual.${string}`>;

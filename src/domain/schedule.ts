@@ -248,17 +248,6 @@ export function newEvent(partial: Partial<EventItem> = {}): EventItem {
 }
 
 /** 人类可读的重复说明，由界面层翻译；这里只给出「结构」 */
-export function recurrenceShape(r: Recurrence): {
-  freq: RecurFreq;
-  interval: number;
-  weekdays: number[];
-} {
-  return {
-    freq: r?.freq ?? 'none',
-    interval: Math.max(1, r?.interval ?? 1),
-    weekdays: r?.weekdays ?? [],
-  };
-}
 
 /** 某天有几条日程（月视图画点用） */
 export function countByDate(occs: Occurrence[]): Map<string, number> {

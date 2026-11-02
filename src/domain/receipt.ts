@@ -67,24 +67,3 @@ export function groupByTx(receipts: Receipt[]): Map<string, Receipt[]> {
 }
 
 /** 生成缩略图（用 canvas 缩放，避免列表里直接渲染 8MB 原图） */
-export async function makeThumbnail(blob: Blob, maxSide = 240): Promise<Blob | null> {
-  if (typeof document === 'undefined' || typeof createImageBitmap !== 'function') return null;
-  try {
-    const bitmap = await createImageBitmap(blob);
-    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-    const w = Math.max(1, Math.round(bitmap.width * scale));
-    const h = Math.max(1, Math.round(bitmap.height * scale));
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(bitmap, 0, 0, w, h);
-    bitmap.close?.();
-    return await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.82);
-    });
-  } catch {
-    return null;
-  }
-}

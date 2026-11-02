@@ -26,8 +26,6 @@ import { TimetablePage } from './TimetablePage';
  * 老地址 `#/schedule?tab=timetable` 仍然认：进来后自动 replace 到新地址，
  * 免得已经存下的书签、通知链接、旧截图脚本全部失效。
  */
-export type ScheduleTab = 'schedule' | 'timetable';
-
 export function ScheduleShell() {
   const { t } = useI18n();
   const { timetable } = useLedger();

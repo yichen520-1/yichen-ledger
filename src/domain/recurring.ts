@@ -402,20 +402,3 @@ export function fixedTotals(rules: RecurringRule[]): { expense: number; income: 
   }
   return { expense, income };
 }
-
-/** 规则的重复节奏说成一句可翻译的参数（界面拼句子用） */
-export function ruleShape(rule: RecurringRule): {
-  freq: BillFreq;
-  interval: number;
-  dayOfMonth: number | null;
-  weekday: number | null;
-  monthOfYear: number | null;
-} {
-  return {
-    freq: rule.freq,
-    interval: Math.max(1, rule.interval || 1),
-    dayOfMonth: rule.dayOfMonth,
-    weekday: rule.weekday,
-    monthOfYear: rule.monthOfYear,
-  };
-}

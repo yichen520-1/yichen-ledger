@@ -204,10 +204,6 @@ export function lastRecordDate(txs: Transaction[]): string | null {
 }
 
 /** 这个月记了多少笔（含转账） */
-export function monthRecordCount(txs: Transaction[], monthKey: string): number {
-  return txs.filter((tx) => tx.date.slice(0, 7) === monthKey).length;
-}
-
 /** 上个月的月份键 */
 export function lastMonth(monthKey: string): string {
   return shiftMonth(monthKey, -1);
