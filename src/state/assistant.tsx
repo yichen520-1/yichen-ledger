@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ask as askLocal,
   buildLedgerContext,
@@ -14,8 +14,21 @@ import { useLedger } from './LedgerContext';
 import { useMode } from './ModeContext';
 import { useI18n, type DictKey } from '../i18n';
 import { chatCompletion, hasKey, loadAiConfig, type AiConfig } from './ai';
-import { createTransaction } from '../db/repository';
-import { createEvent } from '../db/repository';
+import {
+  addPersonaNote,
+  clearChatRecords,
+  createEvent,
+  createTransaction,
+  deleteTransaction,
+  listChatRecords,
+  loadPersonaName,
+  loadPersonaNotes,
+  saveChatRecord,
+  saveBudget,
+  updateTransaction,
+} from '../db/repository';
+import { makeRecord, type ChatRecord } from '../domain/chatlog';
+import { nameToContext, notesToContext, parseRememberCommand, type PersonaNote, withName } from '../domain/persona';
 
 /**
  * 忆小尘的运行时
@@ -34,7 +47,11 @@ import { createEvent } from '../db/repository';
  */
 
 export interface ChatAction {
-  kind: 'transaction' | 'event';
+  /**
+   * v0.10.0 从 2 种扩到 7 种。
+   * 全部都是「点了才写库」—— 助手从不替用户按下保存键。
+   */
+  kind: 'transaction' | 'event' | 'edit' | 'delete' | 'bulk' | 'budget' | 'remember';
   /** 已经落库了没有 */
   applied: boolean;
 }
@@ -49,6 +66,8 @@ export interface ChatMessage {
   answer?: Answer;
   action?: ChatAction;
   pending?: boolean;
+  /** 「记住…」命令解析出来的内容，点确认才写库 */
+  remember?: { key: string; value: string };
 }
 
 export interface AssistantState {
@@ -60,6 +79,16 @@ export interface AssistantState {
   send: (text: string) => Promise<void>;
   reset: () => void;
   applyAnswer: (messageId: string) => Promise<void>;
+  /** 称呼（设置页填的），没填是空串 */
+  personaName: string;
+  /** 助手笔记 */
+  personaNotes: PersonaNote[];
+  /** 改完称呼/笔记后刷新运行时，不用重启 App */
+  refreshPersona: () => void;
+  /** 清空对话（含库里的） */
+  clearHistory: () => Promise<void>;
+  /** 历史记录是否已经读回来了 */
+  historyReady: boolean;
 }
 
 let seq = 0;
@@ -230,10 +259,30 @@ export function renderAnswer(
 
     case 'proposeTransaction': {
       const a = answer.action;
+
+      /**
+       * v0.10.0：多笔时逐条列出来，让用户能一行一行核对再点确认。
+       * 只报一个合计是不负责任的 —— 拆错了人根本看不出来。
+       */
+      if (a.items && a.items.length > 1) {
+        const list = a.items
+          .map((x) => {
+            const sign = x.type === 'income' ? '＋' : x.type === 'transfer' ? '⇄' : '－';
+            const cat = x.type === 'transfer' ? `${x.accountName ?? ''} → ${x.toAccountName ?? ''}` : (x.categoryName ?? '');
+            return `· ${sign}${formatCents(x.amount)} ${x.note || cat}`;
+          })
+          .join('\n');
+        return t('assistant.ans.proposeTxMany', { n: a.items.length, list, total: formatCents(a.amount) });
+      }
+
       const summary = [
-        a.type === 'income' ? '＋' : '－',
+        a.type === 'income' ? '＋' : a.type === 'transfer' ? '⇄' : '－',
         formatCents(a.amount),
-        a.categoryName ? `「${a.categoryName}」` : '',
+        a.type === 'transfer'
+          ? `${a.accountName ?? ''} → ${a.toAccountName ?? ''}`
+          : a.categoryName
+            ? `「${a.categoryName}」`
+            : '',
         a.accountName ?? '',
         a.date,
         a.note ? ` ${a.note}` : '',
@@ -314,6 +363,88 @@ export function renderAnswer(
         events: answer.eventCount,
       });
 
+    case 'proposeEdit': {
+      const { before, after, changes } = answer.target;
+      const parts: string[] = [];
+      if (changes.includes('amount')) {
+        parts.push(t('assistant.ans.editAmount', { before: formatCents(before.amount), after: formatCents(after.amount) }));
+      }
+      if (changes.includes('category')) {
+        parts.push(
+          t('assistant.ans.editCategory', { before: before.categoryName ?? '—', after: after.categoryName ?? '—' }),
+        );
+      }
+      if (changes.includes('note')) {
+        parts.push(t('assistant.ans.editNote', { before: before.note || '—', after: after.note || '—' }));
+      }
+      if (changes.includes('date')) {
+        parts.push(t('assistant.ans.editDate', { before: before.date, after: after.date }));
+      }
+      if (changes.includes('account')) {
+        parts.push(t('assistant.ans.editAccount', { after: after.accountName ?? '—' }));
+      }
+      return t('assistant.ans.proposeEdit', {
+        summary: before.date + ' ' + (before.note || before.categoryName || '—') + ' ' + formatCents(before.amount),
+        changes: parts.join('；'),
+      });
+    }
+
+    case 'proposeDelete':
+      return t('assistant.ans.proposeDelete', {
+        summary:
+          answer.target.date +
+          ' ' +
+          (answer.target.note || answer.target.categoryName || '—') +
+          ' ' +
+          formatCents(answer.target.amount),
+      });
+
+    case 'proposeBulk':
+      return t('assistant.ans.proposeBulk', {
+        n: answer.bulk.txIds.length,
+        cat: answer.bulk.categoryName,
+        from: answer.bulk.periodLabel.from.slice(5),
+        to: answer.bulk.periodLabel.to.slice(5),
+      });
+
+    case 'proposeBudget':
+      return answer.draft.basis.amount > 0
+        ? t('assistant.ans.proposeBudgetBasis', {
+            cat: answer.draft.categoryName ?? t('assistant.ans.budgetOverall'),
+            amount: formatCents(answer.draft.amount),
+            month: answer.draft.basis.month,
+            spent: formatCents(answer.draft.basis.amount),
+          })
+        : t('assistant.ans.proposeBudget', {
+            cat: answer.draft.categoryName ?? t('assistant.ans.budgetOverall'),
+            amount: formatCents(answer.draft.amount),
+          });
+
+    case 'eventSpend': {
+      if (answer.count === 0) {
+        return t('assistant.ans.eventSpendEmpty', { title: answer.eventTitle, date: answer.eventDate });
+      }
+      const list = answer.items
+        .map((x) => '· ' + x.date.slice(5) + ' ' + x.title + ' ' + formatCents(x.amount))
+        .join('\n');
+      return t('assistant.ans.eventSpend', {
+        title: answer.eventTitle,
+        date: answer.eventDate,
+        n: answer.count,
+        total: formatCents(answer.net),
+        list,
+      });
+    }
+
+    case 'vague':
+      // 兜底：说清「我没完全听懂」，但给出方向 + 可以点的示例，
+      // 而不是干巴巴一句「没听懂」把用户推回去重说一遍。
+      return answer.guess === 'money'
+        ? t('assistant.ans.vagueMoney')
+        : answer.guess === 'schedule'
+          ? t('assistant.ans.vagueSchedule')
+          : t('assistant.ans.vagueAny');
+
     case 'unknown':
       return answer.mode === 'ledger' ? t('assistant.ans.unknownLedger') : t('assistant.ans.unknownSchedule');
   }
@@ -390,6 +521,63 @@ export function useAssistant(): AssistantState {
   /** 上一轮问了什么，用来接「那上个月呢」 */
   const lastQueryRef = useRef<LastQuery | null>(null);
 
+  /* ---- v0.10.0：称呼与笔记 ---- */
+  const [personaName, setPersonaName] = useState('');
+  const [personaNotes, setPersonaNotes] = useState<PersonaNote[]>([]);
+  /** 设置页改完之后调它，不用重启 App */
+  const [personaTick, setPersonaTick] = useState(0);
+  const refreshPersona = useCallback(() => setPersonaTick((v) => v + 1), []);
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([loadPersonaName(), loadPersonaNotes()]).then(([name, notes]) => {
+      if (!alive) return;
+      setPersonaName(name);
+      setPersonaNotes(notes);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [personaTick]);
+
+  /* ---- v0.10.0：把上次的对话读回来 ---- */
+  const [historyReady, setHistoryReady] = useState(false);
+  /**
+   * 只在第一次挂载时读库，之后 messages 就是唯一的真相。
+   * 如果每次都跟着 messages 重新读，刚发出去那条会因为「还没写进库」
+   * 被覆盖掉，界面会闪一下。
+   */
+  useEffect(() => {
+    let alive = true;
+    void listChatRecords().then((rows) => {
+      if (!alive) return;
+      if (rows.length > 0) {
+        setMessages(
+          rows.map((r) => ({
+            id: r.id,
+            role: r.role,
+            text: r.text,
+            ...(r.source ? { source: r.source } : {}),
+          })),
+        );
+      }
+      setHistoryReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /**
+   * 落库。只存文本，不存 answer（answer 里带的是当时的账目明细，
+   * 之后那些账目被改了就会显示成「已经不存在的账」）。
+   */
+  const persist = useCallback((record: ChatRecord) => {
+    void saveChatRecord(record).catch(() => {
+      // 存历史失败不该影响对话本身 —— 顶多下次打开看不到这条
+    });
+  }, []);
+
   // 一进来就读一次配置，徽章不必等到第一条消息才变对
   useEffect(() => {
     let alive = true;
@@ -430,6 +618,33 @@ export function useAssistant(): AssistantState {
       const userMsg: ChatMessage = { id: nextId(), role: 'user', text: trimmed };
       const pendingMsg: ChatMessage = { id: nextId(), role: 'assistant', text: '', pending: true };
       setMessages((prev) => [...prev, userMsg, pendingMsg]);
+      persist(makeRecord('user', trimmed, undefined, new Date().toISOString()));
+
+      /**
+       * v0.10.0：「记住我不吃香菜」这类话不进规则引擎，也不该问云端。
+       * 它是一条本地命令 —— 解析出来就是一个待确认的写操作，
+       * 用户点了才真的存进笔记。
+       */
+      const remember = parseRememberCommand(trimmed);
+      if (remember) {
+        const a = { key: remember.key, value: remember.value };
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === pendingMsg.id
+              ? {
+                  ...m,
+                  text: t('assistant.ans.proposeRemember', { key: a.key, value: a.value }),
+                  source: 'local',
+                  action: { kind: 'remember', applied: false },
+                  pending: false,
+                  remember: a,
+                }
+              : m,
+          ),
+        );
+        setBusy(false);
+        return;
+      }
 
       const snap = mode === 'ledger' ? ledgerSnap : scheduleSnap;
 
@@ -475,10 +690,28 @@ export function useAssistant(): AssistantState {
       /** 闲聊命中时，云端失败也不该拿「没听懂」盖掉它 */
       let smallTalk: SmallTalk | null = null;
 
-      // 规则引擎认不出 → 先看看是不是一句普通的聊天
-      if (answer.kind === 'unknown') {
+      /**
+       * 规则引擎认不出 → 先看看是不是一句普通的聊天。
+       *
+       * v0.10.0 的坑：这里原来只判 `kind === 'unknown'`，而这一版在
+       * unknown 之前加了一层 vague 兜底 —— 结果「你好」「谢谢」「今天几号」
+       * 全都被判成 vague，闲聊彻底失效。vague 本来就等于「没听懂」，
+       * 所以两个都要走进来。顺序很重要：**先试闲聊，再退回 vague**，
+       * 因为「你好」比「这句话我没太听懂」是好得多的回答。
+       */
+      if (answer.kind === 'unknown' || answer.kind === 'vague') {
         smallTalk = detectSmallTalk(trimmed);
-        if (smallTalk) text2 = renderSmallTalk(smallTalk, t, dict.weekLong);
+        if (smallTalk) {
+          /*
+           * 闲聊也要带称呼。
+           *
+           * v0.10.0 加了称呼之后，只有开场白那两句用了它 —— 用户填完名字，
+           * 问「你好」还是回「晚上好。今天累不累？」，名字像没生效。
+           * 这里套一层 withName，模板里没有 {name} 占位符时它什么都不做。
+           */
+          const raw = renderSmallTalk(smallTalk, t, dict.weekLong);
+          text2 = personaName ? withName(`{name}，${raw}`, personaName) : raw;
+        }
       }
 
       /**
@@ -501,6 +734,7 @@ export function useAssistant(): AssistantState {
           setCloudCfg(cfg);
           const context =
             mode === 'ledger' ? buildLedgerContext(ledgerSnap, lang) : buildScheduleContext(scheduleSnap, lang);
+          const persona = [nameToContext(personaName), notesToContext(personaNotes)].filter(Boolean);
           const system = [
             '你叫忆小尘，是「忆笺」App 里的助手。忆笺里有记账和日程两块，你都管。说话简短、自然、像朋友聊天，不要端着。',
             '',
@@ -509,6 +743,9 @@ export function useAssistant(): AssistantState {
             mode === 'ledger'
               ? '关于记账：用户想记一笔时，提示他去「记一笔」页，或者直接说「记一笔午饭 25」由我来拆。'
               : '关于日程：用户想加日程时，提示他说「提醒我周三下午三点开会」这类话。',
+            ...(persona.length > 0
+              ? ['', ...persona, '关于称呼：上面有称呼就用它开头，但不要每句都用，那样很腻。']
+              : []),
             '',
             context,
           ].join('\n');
@@ -538,26 +775,54 @@ export function useAssistant(): AssistantState {
         if (!smallTalk) text2 = `${t('assistant.cloudFail', { msg })}\n\n${text2}`;
       }
 
+      /**
+       * 只有「写操作」才带按钮。七种写操作全都要用户点一下才落库 ——
+       * 助手可以提议，但不能替人按下保存键。
+       */
       const action: ChatAction | undefined =
         answer.kind === 'proposeTransaction'
           ? { kind: 'transaction', applied: false }
           : answer.kind === 'proposeEvent'
             ? { kind: 'event', applied: false }
-            : undefined;
+            : answer.kind === 'proposeEdit'
+              ? { kind: 'edit', applied: false }
+              : answer.kind === 'proposeDelete'
+                ? { kind: 'delete', applied: false }
+                : answer.kind === 'proposeBulk'
+                  ? { kind: 'bulk', applied: false }
+                  : answer.kind === 'proposeBudget'
+                    ? { kind: 'budget', applied: false }
+                    : undefined;
 
       setMessages((prev) =>
         prev.map((m) =>
           m.id === pendingMsg.id ? { ...m, text: text2, source, answer, action, pending: false } : m,
         ),
       );
+      persist(makeRecord('assistant', text2, source, new Date().toISOString()));
       setBusy(false);
     },
-    [busy, ledgerSnap, scheduleSnap, mode, t, lang, messages, dict],
+    /*
+     * personaName / personaNotes 必须进依赖数组。
+     *
+     * 这是 v0.10.0 抓到的一个真实缺陷：useCallback 的依赖里漏了 personaName，
+     * 于是 send 一直闭包着第一次渲染时的空串 —— 设置页填了称呼、开场白也显示
+     * 「老陈，我是忆小尘」，可一旦真的问它话，回答里还是不带名字。
+     * 依赖数组写漏的症状就是这样：界面上看得到，但逻辑里读不到。
+     */
+    [busy, ledgerSnap, scheduleSnap, mode, t, lang, messages, dict, personaName, personaNotes],
   );
 
   const reset = useCallback(() => {
     setMessages([]);
     lastQueryRef.current = null;
+  }, []);
+
+  /** 清空对话：界面和库里一起清，不然下次打开又回来了 */
+  const clearHistory = useCallback(async () => {
+    setMessages([]);
+    lastQueryRef.current = null;
+    await clearChatRecords();
   }, []);
 
   /**
@@ -571,23 +836,58 @@ export function useAssistant(): AssistantState {
       if (!msg || !msg.answer) return;
       if (msg.answer.kind === 'proposeTransaction') {
         const a = msg.answer.action;
-        const cat =
-          categories.find((c) => c.name === a.categoryName && c.type === (a.type === 'income' ? 'income' : 'expense')) ??
-          categories.find((c) => c.id === (a.type === 'income' ? 'cat-i-6' : 'cat-e-13')) ??
-          categories.find((c) => c.type === (a.type === 'income' ? 'income' : 'expense'));
-        const acc = accounts.find((x) => x.name === a.accountName) ?? accounts[0];
-        await createTransaction({
-          type: a.type,
-          amountText: (a.amount / 100).toFixed(2),
-          categoryId: cat?.id ?? null,
-          accountId: acc?.id ?? '',
-          toAccountId: null,
-          date: a.date,
-          note: a.note,
-          tagsText: '',
-        });
+        /**
+         * v0.10.0：一句话可能带好几笔（「早饭12，打车28」），也可能是转账。
+         * items 有值就逐条写；没值就是原来那一条。
+         */
+        const rows = a.items && a.items.length > 0 ? a.items : [a];
+
+        for (const row of rows) {
+          const acc = accounts.find((x) => x.name === row.accountName) ?? accounts[0];
+
+          // 转账：分类留空，目标账户必须找得到，否则宁可跳过也不乱记
+          if (row.type === 'transfer') {
+            const to = accounts.find((x) => x.name === row.toAccountName);
+            if (!to || !acc) continue;
+            await createTransaction({
+              type: 'transfer',
+              amountText: (row.amount / 100).toFixed(2),
+              categoryId: null,
+              accountId: acc.id,
+              toAccountId: to.id,
+              date: row.date,
+              note: row.note,
+              tagsText: '',
+            });
+            continue;
+          }
+
+          const cat =
+            categories.find((c) => c.name === row.categoryName && c.type === (row.type === 'income' ? 'income' : 'expense')) ??
+            categories.find((c) => c.id === (row.type === 'income' ? 'cat-i-6' : 'cat-e-13')) ??
+            categories.find((c) => c.type === (row.type === 'income' ? 'income' : 'expense'));
+          await createTransaction({
+            type: row.type,
+            amountText: (row.amount / 100).toFixed(2),
+            categoryId: cat?.id ?? null,
+            accountId: acc?.id ?? '',
+            toAccountId: null,
+            date: row.date,
+            note: row.note,
+            tagsText: '',
+          });
+        }
+
         setMessages((prev) =>
-          prev.map((m) => (m.id === messageId ? { ...m, text: t('assistant.ans.doneTx'), action: { kind: 'transaction', applied: true } } : m)),
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  text: rows.length > 1 ? t('assistant.ans.doneTxMany', { n: rows.length }) : t('assistant.ans.doneTx'),
+                  action: { kind: 'transaction', applied: true },
+                }
+              : m,
+          ),
         );
         return;
       }
@@ -610,9 +910,101 @@ export function useAssistant(): AssistantState {
         setMessages((prev) =>
           prev.map((m) => (m.id === messageId ? { ...m, text: t('assistant.ans.doneEvent'), action: { kind: 'event', applied: true } } : m)),
         );
+        return;
+      }
+
+      /* ---- 改一笔 ---- */
+      if (msg.answer.kind === 'proposeEdit') {
+        const tg = msg.answer.target;
+        const orig = transactions.find((x) => x.id === tg.txId);
+        if (!orig) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === messageId ? { ...m, text: t('assistant.ans.failed'), action: { kind: 'edit', applied: false } } : m)),
+          );
+          return;
+        }
+        const cat =
+          categories.find((c) => c.name === tg.after.categoryName && c.type === orig.type) ??
+          categories.find((c) => c.id === orig.categoryId);
+        const acc = accounts.find((x) => x.name === tg.after.accountName) ?? accounts.find((x) => x.id === orig.accountId);
+        await updateTransaction(orig.id, {
+          type: orig.type,
+          amountText: (tg.after.amount / 100).toFixed(2),
+          categoryId: cat?.id ?? orig.categoryId,
+          accountId: acc?.id ?? orig.accountId,
+          toAccountId: orig.toAccountId,
+          date: tg.after.date,
+          note: tg.after.note,
+          tagsText: orig.tags.join(' '),
+        });
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, text: t('assistant.ans.doneEdit'), action: { kind: 'edit', applied: true } } : m)),
+        );
+        return;
+      }
+
+      /* ---- 删一笔 ---- */
+      if (msg.answer.kind === 'proposeDelete') {
+        await deleteTransaction(msg.answer.target.txId);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, text: t('assistant.ans.doneDelete'), action: { kind: 'delete', applied: true } } : m)),
+        );
+        return;
+      }
+
+      /* ---- 批量归类 ---- */
+      if (msg.answer.kind === 'proposeBulk') {
+        const bulk = msg.answer.bulk;
+        const cat = categories.find((c) => c.name === bulk.categoryName);
+        if (cat) {
+          for (const id of bulk.txIds) {
+            const orig = transactions.find((x) => x.id === id);
+            if (!orig) continue;
+            await updateTransaction(orig.id, {
+              type: orig.type,
+              amountText: (orig.amount / 100).toFixed(2),
+              categoryId: cat.id,
+              accountId: orig.accountId,
+              toAccountId: orig.toAccountId,
+              date: orig.date,
+              note: orig.note,
+              tagsText: orig.tags.join(' '),
+            });
+          }
+        }
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, text: t('assistant.ans.doneBulk', { n: bulk.txIds.length }), action: { kind: 'bulk', applied: true } } : m)),
+        );
+        return;
+      }
+
+      /* ---- 建预算 ---- */
+      if (msg.answer.kind === 'proposeBudget') {
+        const d = msg.answer.draft;
+        const cat = d.categoryName ? categories.find((c) => c.name === d.categoryName) : null;
+        await saveBudget({
+          id: `bud-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+          categoryId: cat?.id ?? null,
+          amount: d.amount,
+          month: d.month,
+          createdAt: new Date().toISOString(),
+        });
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, text: t('assistant.ans.doneBudget'), action: { kind: 'budget', applied: true } } : m)),
+        );
+        return;
+      }
+
+      /* ---- 记住一件事 ---- */
+      if (msg.remember) {
+        const next = await addPersonaNote(msg.remember.key, msg.remember.value);
+        setPersonaNotes(next);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, text: t('assistant.ans.doneRemember'), action: { kind: 'remember', applied: true } } : m)),
+        );
       }
     },
-    [messages, categories, accounts, t],
+    [messages, categories, accounts, transactions, t],
   );
 
   /**
@@ -622,5 +1014,18 @@ export function useAssistant(): AssistantState {
    */
   const cloud = cloudCfg;
 
-  return { messages, busy, mode, cloud, send, reset, applyAnswer };
+  return {
+    messages,
+    busy,
+    mode,
+    cloud,
+    send,
+    reset,
+    applyAnswer,
+    personaName,
+    personaNotes,
+    refreshPersona,
+    clearHistory,
+    historyReady,
+  };
 }

@@ -241,9 +241,37 @@ describe('记账问答', () => {
     expect(a.points[a.points.length - 1].month).toBe('2024-03');
   });
 
-  it('听不懂时给出提示而不是崩溃', () => {
+  it('听不懂时给出有方向的回应，而不是干巴巴一句「没听懂」', () => {
+    // v0.10.0 起 unknown 前面多了一层模糊兜底：这句话里没有账本/日程的
+    // 强信号，但也不该只回一句「没听懂」。归到 smalltalk 方向，给几个示例。
     const a = answerLedger('今天天气怎么样', ledger(txs));
-    expect(a.kind).toBe('unknown');
+    expect(a.kind).toBe('vague');
+    if (a.kind !== 'vague') return;
+    expect(a.guess).toBe('smalltalk');
+    expect(a.hints.length).toBeGreaterThan(0);
+  });
+
+  it('带钱味的模糊说法归到 money', () => {
+    // 「这个月花得有点凶」会被 spend 分支认走（有「花」+「这个月」），
+    // 这里要的是「有花钱的味道、但没有具体问法」的那类句子。
+    const a = answerLedger('最近是不是有点贵', ledger(txs));
+    expect(a.kind).toBe('vague');
+    if (a.kind !== 'vague') return;
+    expect(a.guess).toBe('money');
+  });
+
+  it('带日程味的模糊说法归到 schedule', () => {
+    // 「下周是不是很忙」会被 forecast 分支认走（时间词 + 忙），
+    // 所以这里用没有时间词的句子。
+    const a = answerLedger('我最近是不是太忙了', ledger(txs));
+    expect(a.kind).toBe('vague');
+    if (a.kind !== 'vague') return;
+    expect(a.guess).toBe('schedule');
+  });
+
+  it('「这个月花得有点凶」被当成花钱的问题，而不是听不懂', () => {
+    const a = answerLedger('这个月花得有点凶', ledger(txs));
+    expect(a.kind).toBe('spend');
   });
 });
 

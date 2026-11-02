@@ -24,6 +24,16 @@ import {
 import { templateFromTransaction, upsertTemplate, type QuickTemplate } from '../domain/quick';
 import { RECEIPT_MAX_PER_TX, checkReceiptFile, type Receipt } from '../domain/receipt';
 import { settlementDraft } from '../domain/receivable';
+import { CHAT_KEEP, sortRecords, trimRecords, type ChatRecord } from '../domain/chatlog';
+import {
+  NOTES_MAX,
+  PERSONA_NAME_KEY,
+  PERSONA_NOTES_KEY,
+  normalizeName,
+  normalizeNotes,
+  upsertNote,
+  type PersonaNote,
+} from '../domain/persona';
 import {
   clampWeek,
   newCourse,
@@ -856,4 +866,97 @@ export async function unsettleReceivable(original: Transaction): Promise<void> {
     if (original.settledBy) await db.transactions.delete(original.settledBy);
     await db.transactions.update(original.id, { settledBy: null, updatedAt: now });
   });
+}
+
+/* ================================================================
+   v0.10.0：对话记录与忆小尘的个人记忆
+   ================================================================ */
+
+/**
+ * 读最近 50 条对话。
+ *
+ * 用 orderBy('createdAt') 而不是 toArray()：记录会一直变多，
+ * 全读出来再切最后 50 条，用一年之后每次开面板都要读几千条。
+ */
+export async function listChatRecords(): Promise<ChatRecord[]> {
+  const rows = await db.chat.orderBy('createdAt').toArray();
+  return trimRecords(rows);
+}
+
+/** 存一条对话，并把总量裁到 50 条 */
+export async function saveChatRecord(record: ChatRecord): Promise<void> {
+  await db.chat.put(record);
+  const count = await db.chat.count();
+  if (count <= CHAT_KEEP) return;
+  // 多出来的按时间从旧到新删掉
+  const all = await db.chat.orderBy('createdAt').toArray();
+  const doomed = sortRecords(all).slice(0, Math.max(0, all.length - CHAT_KEEP));
+  if (doomed.length > 0) {
+    await db.chat.bulkDelete(doomed.map((r) => r.id));
+  }
+}
+
+/** 清空对话。设置页那个「清空」按钮走这里 */
+export async function clearChatRecords(): Promise<void> {
+  await db.chat.clear();
+}
+
+/* ---------------------------------------------------------------- 个人记忆 */
+
+/** 读称呼 */
+export async function loadPersonaName(): Promise<string> {
+  const row = await db.settings.get(PERSONA_NAME_KEY);
+  return normalizeName(row?.value);
+}
+
+/** 存称呼；传空串就是清掉 */
+export async function savePersonaName(name: string): Promise<void> {
+  const clean = normalizeName(name);
+  if (!clean) {
+    await db.settings.delete(PERSONA_NAME_KEY);
+    return;
+  }
+  await db.settings.put({ key: PERSONA_NAME_KEY, value: clean });
+}
+
+/** 读助手笔记 */
+export async function loadPersonaNotes(): Promise<PersonaNote[]> {
+  const row = await db.settings.get(PERSONA_NOTES_KEY);
+  if (!row) return [];
+  let raw: unknown = row.value;
+  // settings.value 是 string；存的时候 JSON.stringify，读的时候要兜住坏数据
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  return normalizeNotes(raw, new Date().toISOString()).slice(0, NOTES_MAX);
+}
+
+/** 覆盖写整份笔记列表 */
+export async function savePersonaNotes(notes: PersonaNote[]): Promise<void> {
+  if (notes.length === 0) {
+    await db.settings.delete(PERSONA_NOTES_KEY);
+    return;
+  }
+  await db.settings.put({ key: PERSONA_NOTES_KEY, value: JSON.stringify(notes.slice(0, NOTES_MAX)) });
+}
+
+/** 加一条（同 key 替换）。返回新的整份列表，界面直接拿去 setState */
+export async function addPersonaNote(key: string, value: string): Promise<PersonaNote[]> {
+  const now = new Date().toISOString();
+  const current = await loadPersonaNotes();
+  const next = upsertNote(current, key, value, now);
+  await savePersonaNotes(next);
+  return next;
+}
+
+/** 删一条 */
+export async function deletePersonaNote(id: string): Promise<PersonaNote[]> {
+  const current = await loadPersonaNotes();
+  const next = current.filter((n) => n.id !== id);
+  await savePersonaNotes(next);
+  return next;
 }

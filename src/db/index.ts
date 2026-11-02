@@ -5,6 +5,7 @@ import type { EventItem } from '../domain/schedule';
 import type { Course } from '../domain/timetable';
 import type { QuickTemplate } from '../domain/quick';
 import type { Receipt } from '../domain/receipt';
+import type { ChatRecord } from '../domain/chatlog';
 
 /**
  * 本地数据库（IndexedDB）。
@@ -22,6 +23,8 @@ export class LedgerDB extends Dexie {
   recurring!: Table<RecurringRule, string>;
   quick!: Table<QuickTemplate, string>;
   receipts!: Table<Receipt, string>;
+  /** v0.10.0：对话记录。关掉面板再打开还能接着聊 */
+  chat!: Table<ChatRecord, string>;
 
   constructor(name = 'yichen-ledger') {
     super(name);
@@ -101,6 +104,30 @@ export class LedgerDB extends Dexie {
       recurring: 'id, type, archived',
       quick: 'id, name',
       receipts: 'id, txId',
+    });
+
+    /*
+     * v0.10.0：加对话记录表。
+     *
+     * 为什么对话要进 IndexedDB 而不是 localStorage：
+     *   50 条消息带结构化 answer（里面有账目明细、日程列表），
+     *   序列化后轻松超过 localStorage 的 5MB 上限；而且这些内容和
+     *   账本一样属于「只在这台设备上」的数据，放在同一个库里更好解释。
+     *
+     * 索引只用 createdAt：读的时候永远按时间正序取最近 50 条，不需要别的维度。
+     */
+    this.version(7).stores({
+      accounts: 'id, kind, archived, sort',
+      categories: 'id, type, sort',
+      transactions: 'id, date, type, categoryId, accountId, toAccountId',
+      budgets: 'id, categoryId, month',
+      settings: 'key',
+      events: 'id, date, done',
+      courses: 'id, name',
+      recurring: 'id, type, archived',
+      quick: 'id, name',
+      receipts: 'id, txId',
+      chat: 'id, createdAt',
     });
   }
 }

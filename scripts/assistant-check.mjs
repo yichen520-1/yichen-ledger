@@ -217,8 +217,23 @@ try {
   // 切模式不丢对话，这是有意的；点「重新开始」才回到空白问候页
   const keptRows = await page.$$eval('.assistant-row', (els) => els.length);
   check('切模式后对话还在', keptRows > 0, `${keptRows} 条`);
+  // v0.10.0 起这个按钮从「重新开始（只清屏幕）」变成了「清空对话」，
+  // 会弹 window.confirm。原生弹窗会卡住 page.evaluate，必须先挂 dialog 处理器。
+  page.once('dialog', (d) => void d.accept());
   await page.evaluate(() => document.querySelector('.assistant-head .btn.icon-btn')?.click());
-  await sleep(400);
+  await sleep(900);
+  const afterClear = await page.$$eval('.assistant-row', (els) => els.length);
+  check('清空对话后回到问候页', afterClear === 0, `${afterClear} 条`);
+  // 关掉再打开，确认库里也清了（不是只清了屏幕）
+  await page.evaluate(() => {
+    const btns = document.querySelectorAll('.assistant-head .btn.icon-btn');
+    if (btns[1]) btns[1].click();
+  });
+  await sleep(500);
+  await page.click('.assistant-fab');
+  await sleep(1000);
+  const afterReopen = await page.$$eval('.assistant-row', (els) => els.length);
+  check('重开面板历史确实清了', afterReopen === 0, `${afterReopen} 条`);
   const schedSugs = await page.$$eval('.assistant-sug', (els) => els.map((e) => e.textContent.trim()));
   check('日程模式给的是日程示例', schedSugs.some((s) => s.includes('日程') || s.includes('空')), schedSugs.join(' / '));
 

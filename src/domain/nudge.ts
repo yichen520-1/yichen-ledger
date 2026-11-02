@@ -6,6 +6,7 @@ import {
   monthTotals,
   shiftMonth,
   toDateKey,
+  type Budget,
   type Category,
   type Transaction,
 } from './model';
@@ -26,7 +27,21 @@ import { weekRangeOf, weekStats } from './weekly';
  * 判断逻辑能单测，不依赖浏览器。
  */
 
-export type NudgeKind = 'overspend' | 'billDue' | 'noRecord' | 'budgetOver' | 'topCategory';
+export type NudgeKind =
+  | 'overspend'
+  | 'billDue'
+  | 'noRecord'
+  | 'budgetOver'
+  | 'topCategory'
+  /* ---- v0.10.0 ---- */
+  /** 每月 1~3 号，说上个月过得怎么样 */
+  | 'monthlyReview'
+  /** 某个分类这个月突然花得比过去半年多很多 */
+  | 'abnormal'
+  /** 预算快用完了，但离月底还有一段 */
+  | 'budgetAlmost'
+  /** 晚上还没记账 */
+  | 'lateNight';
 
 export interface Nudge {
   kind: NudgeKind;
@@ -45,6 +60,10 @@ export interface NudgeContext {
   categories: Category[];
   /** 最近一次记账的日期；没有账目时传 null */
   lastRecordDate: string | null;
+  /** v0.10.0：预算表。要判断「预算快用完了」，光有固定支出规则不够 */
+  budgets?: Budget[];
+  /** v0.10.0：当前几点（0~23）。记账提醒要挑时机，晚上才提 */
+  hour?: number;
 }
 
 /**
@@ -59,6 +78,21 @@ export const NO_RECORD_DAYS = 3;
 /** 「比上周多花」的门槛：金额 200 元且比例 30%，两个都要过。 */
 export const OVERSPEND_MIN_CENTS = 20000;
 export const OVERSPEND_MIN_RATIO = 0.3;
+
+/* ---------------------------------------------------------- v0.10.0 门槛 */
+
+/** 月末回顾只在每月这几天说（1~3 号），再晚就不叫「月末」了 */
+export const REVIEW_DAYS = 3;
+/** 异常消费：这个月这一类得超过过去半年月均的这么多倍才算「异常」 */
+export const ABNORMAL_RATIO = 2;
+/** 异常消费还得有个绝对门槛，不然「宠物这个月花了 3 块 vs 半年月均 1 块」也会报 */
+export const ABNORMAL_MIN_CENTS = 30000;
+/** 预算用了这么多就算「快用完了」 */
+export const BUDGET_ALMOST_RATIO = 0.8;
+/** 但离月底不足这么多天时就不提了 —— 那时候说「快用完了」只是添堵 */
+export const BUDGET_ALMOST_MIN_DAYS_LEFT = 7;
+/** 晚上几点之后才提「今天还没记账」 */
+export const LATE_NIGHT_HOUR = 21;
 
 function daysBetween(a: string, b: string): number {
   const da = new Date(`${a}T00:00:00`);
@@ -143,6 +177,133 @@ export function pickNudge(ctx: NudgeContext): Nudge | null {
       vars: { over: formatCents(totals.expense - budgetTotal) },
       weight: 50,
     });
+  }
+
+  /* ================================================================
+   * v0.10.0：四种新的主动开口
+   * ----------------------------------------------------------------
+   * 这四种的共同点是「有时间性」：
+   *   月末回顾只在 1~3 号有意义，过了就永远不说了；
+   *   异常消费得在当月说，等下个月就变成历史；
+   *   预算将尽要在还来得及的时候说；
+   *   记账提醒要在晚上说 —— 早上九点催人记账只会被划走。
+   * 所以它们都自带时间闸门，闸门关着就根本不进候选列表。
+   * ================================================================ */
+
+  /* ---- 5) 月末回顾：每月 1~3 号 ---- */
+  const dayOfMonth = Number(ctx.today.slice(8, 10));
+  if (dayOfMonth <= REVIEW_DAYS) {
+    const prev = shiftMonth(month, -1);
+    const prevTotals = monthTotals(ctx.transactions, prev);
+    const beforeTotals = monthTotals(ctx.transactions, shiftMonth(month, -2));
+    if (prevTotals.expense > 0) {
+      const diff = prevTotals.expense - beforeTotals.expense;
+      const pct = beforeTotals.expense > 0 ? Math.abs(diff) / beforeTotals.expense : null;
+      candidates.push({
+        kind: 'monthlyReview',
+        text: 'nudge.monthlyReview',
+        vars: {
+          month: prev,
+          amount: formatCents(prevTotals.expense),
+          dir: diff >= 0 ? 'nudge.monthlyReviewUp' : 'nudge.monthlyReviewDown',
+          pct: pct === null ? '—' : `${Math.round(pct * 100)}%`,
+        },
+        // 月末回顾只在头三天出现，出现时优先级仅次于账单到期
+        weight: 90,
+      });
+    }
+  }
+
+  /* ---- 6) 异常消费：某类这个月超过过去半年月均的 2 倍 ---- */
+  {
+    const sixMonths = [1, 2, 3, 4, 5, 6].map((i) => shiftMonth(month, -i));
+    const perCat = new Map<string, number[]>();
+    for (const m of sixMonths) {
+      for (const tx of ctx.transactions) {
+        if (tx.type !== 'expense' || monthKeyOf(tx.date) !== m) continue;
+        if (!isStatistical(tx)) continue;
+        const key = tx.categoryId ?? '';
+        const arr = perCat.get(key) ?? [];
+        arr.push(tx.amount);
+        perCat.set(key, arr);
+      }
+    }
+    const thisMonth = new Map<string, number>();
+    for (const tx of ctx.transactions) {
+      if (tx.type !== 'expense' || monthKeyOf(tx.date) !== month) continue;
+      if (!isStatistical(tx)) continue;
+      const key = tx.categoryId ?? '';
+      thisMonth.set(key, (thisMonth.get(key) ?? 0) + tx.amount);
+    }
+    let worst: { id: string; now: number; avg: number; ratio: number } | null = null;
+    for (const [id, now] of thisMonth) {
+      const past = perCat.get(id) ?? [];
+      if (past.length === 0) continue;
+      const avg = Math.round(past.reduce((a, b) => a + b, 0) / sixMonths.length);
+      if (avg <= 0) continue;
+      const ratio = now / avg;
+      if (ratio < ABNORMAL_RATIO || now < ABNORMAL_MIN_CENTS) continue;
+      if (!worst || ratio > worst.ratio) worst = { id, now, avg, ratio };
+    }
+    if (worst) {
+      const name = ctx.categories.find((c) => c.id === worst!.id)?.name ?? null;
+      if (name) {
+        candidates.push({
+          kind: 'abnormal',
+          text: 'nudge.abnormal',
+          vars: {
+            cat: name,
+            amount: formatCents(worst.now),
+            ratio: worst.ratio.toFixed(1),
+          },
+          weight: 70 + Math.min(Math.round((worst.ratio - ABNORMAL_RATIO) * 10), 25),
+        });
+      }
+    }
+  }
+
+  /* ---- 7) 预算将尽：用了 80% 且离月底还有一周以上 ---- */
+  {
+    const dim = daysInMonth(month);
+    const daysLeft = dim - dayOfMonth + 1;
+    if (daysLeft >= BUDGET_ALMOST_MIN_DAYS_LEFT) {
+      for (const b of ctx.budgets ?? []) {
+        if (b.amount <= 0) continue;
+        const spent = ctx.transactions
+          .filter((tx) => tx.type === 'expense' && monthKeyOf(tx.date) === month)
+          .filter((tx) => (b.categoryId ? tx.categoryId === b.categoryId : true))
+          .filter((tx) => isStatistical(tx))
+          .reduce((acc, tx) => acc + tx.amount, 0);
+        const ratio = spent / b.amount;
+        if (ratio < BUDGET_ALMOST_RATIO || ratio > 1) continue;
+        const name = b.categoryId
+          ? ctx.categories.find((c) => c.id === b.categoryId)?.name ?? null
+          : null;
+        candidates.push({
+          kind: 'budgetAlmost',
+          text: 'nudge.budgetAlmost',
+          vars: {
+            cat: name ?? '',
+            pct: `${Math.round(ratio * 100)}%`,
+            days: String(daysLeft),
+          },
+          weight: 45 + Math.round(ratio * 10),
+        });
+      }
+    }
+  }
+
+  /* ---- 8) 晚上还没记账 ---- */
+  if (ctx.hour !== undefined && ctx.hour >= LATE_NIGHT_HOUR) {
+    const recordedToday = ctx.transactions.some((tx) => tx.date === ctx.today);
+    if (!recordedToday) {
+      candidates.push({
+        kind: 'lateNight',
+        text: 'nudge.lateNight',
+        vars: {},
+        weight: 35,
+      });
+    }
   }
 
   if (candidates.length === 0) return null;

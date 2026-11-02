@@ -27,9 +27,6 @@ import {
   netWorth,
   shiftMonth,
   toDateKey,
-  type Account,
-  type Budget,
-  type Category,
   type Transaction,
   type TxType,
 } from './model';
@@ -43,8 +40,34 @@ import {
   type EventItem,
   type Occurrence,
 } from './schedule';
-import { fixedTotals, pendingBills, type RecurringRule } from './recurring';
+import { fixedTotals, pendingBills } from './recurring';
 import { weekRangeOf, weekSchedule, weekStats } from './weekly';
+import {
+  CATEGORY_SYNONYMS,
+  fmtMinutes,
+  matchCategory,
+  parseTimeOfDay,
+  parseTransferIntent,
+  toNum,
+} from './parse';
+import {
+  parseBudgetCommand,
+  parseBulkRetarget,
+  parseDeleteCommand,
+  parseEditCommand,
+  parseRecordCommands,
+  shiftMonthKey,
+  type BudgetDraft,
+  type BulkRetarget,
+  type DeleteTarget,
+  type EditTarget,
+} from './assistant-actions';
+import type { LedgerSnapshot, ScheduleSnapshot } from './snapshot';
+
+// 类型从这里再导出一次，老的 import 路径（'../domain/assistant'）继续可用
+export type { LedgerSnapshot, ScheduleSnapshot };
+// 口语词表也一样：日程侧和单测还在从 assistant 里取
+export { matchCategory, parseTimeOfDay, toNum, fmtMinutes, CATEGORY_SYNONYMS };
 
 /* ------------------------------------------------------------------ 时间区间 */
 
@@ -71,28 +94,6 @@ export interface Period {
   month: string | null;
   from: string;
   to: string;
-}
-
-/** 中文数字 → 阿拉伯数字，只处理 1~12，够用了 */
-const CN_NUM: Record<string, number> = {
-  一: 1,
-  二: 2,
-  两: 2,
-  三: 3,
-  四: 4,
-  五: 5,
-  六: 6,
-  七: 7,
-  八: 8,
-  九: 9,
-  十: 10,
-  十一: 11,
-  十二: 12,
-};
-
-function toNum(raw: string): number {
-  if (/^\d+$/.test(raw)) return Number(raw);
-  return CN_NUM[raw] ?? 0;
 }
 
 /** 某月第一天 / 最后一天 */
@@ -236,8 +237,39 @@ export type Answer =
   | { kind: 'eventsInPeriod'; period: Period; items: Array<{ title: string; date: string; time: string; allDay: boolean; done: boolean }> }
   | { kind: 'freeTime'; date: string; busy: Array<{ title: string; start: string; end: string }>; freeSlots: Array<[string, string]> }
   | { kind: 'nextEvents'; items: Array<{ title: string; date: string; time: string }> }
+  /* ---- v0.10.0：一次可以记多笔 ---- */
   | { kind: 'proposeTransaction'; action: ProposedTransaction; note: string }
+  /* ---- v0.10.0：改一笔、删一笔、批量归类、建预算 ---- */
+  | { kind: 'proposeEdit'; target: EditTarget }
+  | { kind: 'proposeDelete'; target: DeleteTarget }
+  | { kind: 'proposeBulk'; bulk: BulkRetarget }
+  | { kind: 'proposeBudget'; draft: BudgetDraft }
   | { kind: 'proposeEvent'; action: ProposedEvent; note: string }
+  /* ---- v0.10.0：事件账本（一场活动一共花了多少） ---- */
+  | {
+      kind: 'eventSpend';
+      /** 命中的日程 */
+      eventTitle: string;
+      eventDate: string;
+      /** 挂在这场活动上的账目 */
+      items: Array<{ id: string; title: string; date: string; amount: number; type: TxType; categoryName: string | null }>;
+      expense: number;
+      income: number;
+      net: number;
+      count: number;
+      /** 同名/近似匹配到的其他日程，让用户知道认的是哪一场 */
+      otherTitles: string[];
+    }
+  /* ---- v0.10.0：兜底。没认出来，但看得出大概想问什么 ---- */
+  | {
+      kind: 'vague';
+      /** 猜的方向 */
+      guess: 'money' | 'schedule' | 'smalltalk';
+      /** 给界面显示的几个可点示例 */
+      hints: string[];
+      /** 原话，兜底话术里要引用 */
+      said: string;
+    }
   /* ---- v0.8.0 跨模块 ---- */
   | {
       kind: 'txList';
@@ -292,15 +324,9 @@ export type Answer =
     }
   | { kind: 'unknown'; mode: 'ledger' | 'schedule'; hints: string[] };
 
-export interface ProposedTransaction {
-  type: TxType;
-  /** 分 */
-  amount: number;
-  categoryName: string | null;
-  accountName: string | null;
-  date: string;
-  note: string;
-}
+// ProposedTransaction / ParsedRecord 在 assistant-actions.ts 里定义（解析逻辑在那儿）
+export type { ProposedTransaction, ParsedRecord } from './assistant-actions';
+import type { ProposedTransaction } from './assistant-actions';
 
 export interface ProposedEvent {
   title: string;
@@ -308,65 +334,6 @@ export interface ProposedEvent {
   startTime: string;
   endTime: string;
   allDay: boolean;
-}
-
-export interface LedgerSnapshot {
-  today: string;
-  accounts: Account[];
-  categories: Category[];
-  transactions: Transaction[];
-  budgets: Budget[];
-  /**
-   * v0.8.0 跨模块问答要用到的东西。
-   * 都设成可选：老的调用点（单测、日程侧）不传也能跑，
-   * 只是跨模块那几类问题会退化成 unknown。
-   */
-  events?: EventItem[];
-  rules?: RecurringRule[];
-}
-
-export interface ScheduleSnapshot {
-  today: string;
-  events: EventItem[];
-}
-
-/* ------------------------------------------------------------- 分类同义词 */
-
-/**
- * 口语 → 分类名的映射。
- * 用户不会说「我餐饮花了多少」，他会说「吃饭」「点外卖」「打车」。
- * 这里只放最常见的，匹配不到就退回「按分类名包含」的模糊匹配。
- */
-const CATEGORY_SYNONYMS: Record<string, string[]> = {
-  餐饮: ['吃饭', '吃饭钱', '吃', '外卖', '餐厅', '下馆子', '伙食', '餐费', '咖啡', '奶茶', '早餐', '午饭', '晚饭'],
-  买菜: ['菜', '超市', '生鲜', '菜钱'],
-  交通: ['打车', '地铁', '公交', '车费', '加油', '高铁', '火车票', '机票'],
-  购物: ['买东西', '网购', '衣服', '鞋', '购物'],
-  居住: ['房租', '房贷', '租房', '物业'],
-  水电燃气: ['水费', '电费', '燃气', '煤气', '水电'],
-  通讯: ['话费', '流量', '网费', '宽带'],
-  娱乐: ['玩', '游戏', '电影', '演出', '娱乐'],
-  医疗: ['看病', '药', '医院', '体检'],
-  教育: ['学费', '书', '课程', '培训'],
-  人情: ['红包', '礼金', '随礼', '份子'],
-  宠物: ['猫', '狗', '宠物'],
-  旅行: ['旅游', '出行', '酒店', '住宿'],
-  工资: ['薪水', '工资'],
-};
-
-/** 在文本里找分类，返回分类 id（找不到返回 null） */
-export function matchCategory(text: string, categories: Category[], type: TxType = 'expense'): Category | null {
-  const pool = categories.filter((c) => c.type === (type === 'income' ? 'income' : 'expense'));
-  // 1. 分类名直接出现
-  const direct = pool.find((c) => text.includes(c.name));
-  if (direct) return direct;
-  // 2. 同义词
-  for (const cat of pool) {
-    const syns = CATEGORY_SYNONYMS[cat.name];
-    if (!syns) continue;
-    if (syns.some((s) => text.includes(s))) return cat;
-  }
-  return null;
 }
 
 /* --------------------------------------------------------------- 记账类问答 */
@@ -381,9 +348,92 @@ export function answerLedger(text: string, snap: LedgerSnapshot): Answer {
   const t = raw.replace(/\s+/g, '');
   const period = parsePeriod(t, snap.today) ?? resolvePeriod('thisMonth', 1, snap.today);
 
-  /* ---- 先看是不是「记一笔」这种写操作 ---- */
-  const record = parseRecordCommand(raw, snap);
-  if (record) return { kind: 'proposeTransaction', action: record, note: raw };
+  /* ================================================================
+   * v0.10.0：写操作优先
+   * ----------------------------------------------------------------
+   * 顺序有讲究：
+   *   删 → 改 → 批量归类 → 建预算 → 记账 → 转账
+   * 因为「把刚才那笔删了」里也含「那笔」，先认删才不会当成记账；
+   * 「这周打车那几笔都算交通」含「打车」，先认批量才不会当成「查打车」。
+   * ================================================================ */
+
+  /* ---- 删一笔 ---- */
+  const del = parseDeleteCommand(raw, snap);
+  if (del) return { kind: 'proposeDelete', target: del };
+
+  /* ---- 改一笔 ---- */
+  const edit = parseEditCommand(raw, snap);
+  if (edit) return { kind: 'proposeEdit', target: edit };
+
+  /* ---- 批量归类 ---- */
+  const bulk = parseBulkRetarget(raw, snap, parsePeriod(t, snap.today));
+  if (bulk) return { kind: 'proposeBulk', bulk };
+
+  /* ---- 建预算 ---- */
+  const budgetDraft = parseBudgetCommand(raw, snap, (m) => shiftMonthKey(m, -1));
+  if (budgetDraft) return { kind: 'proposeBudget', draft: budgetDraft };
+
+  /* ---- 转账（必须先于记账：转账也带金额和账户名） ---- */
+  const transfer = parseTransferIntent(raw, snap.accounts);
+  if (transfer && /(记|转)/.test(raw)) {
+    return {
+      kind: 'proposeTransaction',
+      action: {
+        type: 'transfer',
+        amount: transfer.amount,
+        categoryName: null,
+        accountName: transfer.from.name,
+        toAccountName: transfer.to.name,
+        date: snap.today,
+        note: transfer.note,
+      },
+      note: raw,
+    };
+  }
+
+  /* ---- 记一笔（可能不止一笔） ---- */
+  const records = parseRecordCommands(raw, snap);
+  if (records.length === 1) {
+    const r = records[0];
+    return {
+      kind: 'proposeTransaction',
+      action: {
+        type: r.type,
+        amount: r.amount,
+        categoryName: r.categoryName,
+        accountName: r.accountName,
+        toAccountName: r.toAccountName,
+        date: r.date,
+        note: r.note,
+      },
+      note: raw,
+    };
+  }
+  if (records.length > 1) {
+    // 多笔：拼成一个「总动作」，界面按 items 逐条列，点一次全记
+    return {
+      kind: 'proposeTransaction',
+      action: {
+        type: records[0].type,
+        amount: records.reduce((acc, r) => acc + r.amount, 0),
+        categoryName: null,
+        accountName: records[0].accountName,
+        toAccountName: null,
+        date: records[0].date,
+        note: raw,
+        items: records.map((r) => ({
+          type: r.type,
+          amount: r.amount,
+          categoryName: r.categoryName,
+          accountName: r.accountName,
+          toAccountName: r.toAccountName,
+          date: r.date,
+          note: r.note,
+        })),
+      },
+      note: raw,
+    };
+  }
 
   /* ---- 净资产 / 我还有多少钱 ---- */
   // 「我现在有多少钱」这种问法里没有「净资产」三个字，但它问的就是总资产，
@@ -488,6 +538,54 @@ export function answerLedger(text: string, snap: LedgerSnapshot): Answer {
    * 是因为它们的关键词比较「泛」（「几次」「那几天」「待确认」），
    * 排在前面会把「这个月花了多少」这类基础问题抢走。
    * ================================================================ */
+
+  /* ---- 「去杭州那趟一共花了多少」 ---- */
+  // 关键词：一趟 / 那次 / 这场 / 那场 + 花钱。日程标题靠包含匹配认。
+  // 「那趟」「这趟」比「一趟」更常说 —— 漏掉它，「杭州出差那趟花了多少」就被
+  // 当成普通支出问题，「那趟」两个字完全没被利用。
+  if (
+    /(一趟|这趟|那趟|那次|这次|这场|那场|这个活动|那个活动|出行|旅行)/.test(t) &&
+    /(花|支出|消费|花了多少|一共)/.test(t)
+  ) {
+    const events = snap.events ?? [];
+    // 找出标题里跟这句话有交集的日程
+    const hit = events
+      .filter((ev) => {
+        // 标题的字在这句话里出现过 2 个以上，就算提到它
+        const chars = [...new Set(ev.title.replace(/[\s\p{P}]/gu, '').split(''))];
+        const common = chars.filter((c) => t.includes(c));
+        return common.length >= 2 && common.length / Math.max(chars.length, 1) >= 0.5;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    if (hit.length > 0) {
+      const ev = hit[0];
+      const linked = snap.transactions.filter((tx) => tx.eventId === ev.id);
+      const expense = linked.filter((tx) => tx.type === 'expense').reduce((acc, tx) => acc + tx.amount, 0);
+      const income = linked.filter((tx) => tx.type === 'income').reduce((acc, tx) => acc + tx.amount, 0);
+      return {
+        kind: 'eventSpend',
+        eventTitle: ev.title,
+        eventDate: ev.date,
+        items: linked
+          .slice()
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .map((tx) => ({
+            id: tx.id,
+            title: tx.note || snap.categories.find((c) => c.id === tx.categoryId)?.name || '—',
+            date: tx.date,
+            amount: tx.amount,
+            type: tx.type,
+            categoryName: snap.categories.find((c) => c.id === tx.categoryId)?.name ?? null,
+          })),
+        expense,
+        income,
+        net: expense - income,
+        count: linked.length,
+        otherTitles: hit.slice(1, 3).map((e) => e.title),
+      };
+    }
+  }
 
   /* ---- 「这个月看电影花了几次，分别是哪几天」 ---- */
   // 关键词组合：次数 + 花钱（或直接问「哪几笔」）。分类靠 matchCategory 认。
@@ -620,7 +718,39 @@ export function answerLedger(text: string, snap: LedgerSnapshot): Answer {
     };
   }
 
-  return { kind: 'unknown', mode: 'ledger', hints: ['spend', 'top', 'budget', 'net'] };
+  /* ================================================================
+   * v0.10.0：模糊兜底
+   * ----------------------------------------------------------------
+   * 走到这里说明上面所有规则都没命中。但用户说的话往往不是「没意义」，
+   * 只是没说到那几个关键词上：
+   *   「这个月花得有点凶」——没有「多少」「支出」，但有「花」
+   *   「最近是不是有点乱」——什么都没说，但语气在问状态
+   * 直接回「没听懂」太生硬。所以再退一层，按弱信号猜个方向，
+   * 给一句有方向的回应 + 几个可点的示例，让用户接着说下去。
+   *
+   * 为什么只猜三个方向（钱 / 日程 / 闲聊）：
+   *   猜得更细就会猜错。三个方向是「他这句话大概在说哪一块」，
+   *   猜错了用户也只需要换一句话，不会觉得被误导。
+   * ================================================================ */
+  const weakMoney = /(花|钱|支出|消费|开销|贵|便宜|省|浪费|超支|预算|余额|账户)/.test(t);
+  const weakSchedule = /(日程|安排|时间|忙|空|会议|开会|约|提醒|截止|ddl|赶)/i.test(t);
+  if (weakMoney) {
+    return {
+      kind: 'vague',
+      guess: 'money',
+      hints: ['spend', 'top', 'budget', 'trend'],
+      said: raw,
+    };
+  }
+  if (weakSchedule) {
+    return {
+      kind: 'vague',
+      guess: 'schedule',
+      hints: ['week', 'free', 'addEvent'],
+      said: raw,
+    };
+  }
+  return { kind: 'vague', guess: 'smalltalk', hints: ['spend', 'week'], said: raw };
 }
 
 /* ------------------------------------------------------------- 「记一笔」解析 */
@@ -702,27 +832,6 @@ export function parseWeekday(text: string, today: string): string | null {
   return toDateKey(base);
 }
 
-/** 「下午三点」「14:30」「早上9点」→ 'HH:mm' */
-export function parseTimeOfDay(text: string): string | null {
-  const t = text.replace(/\s+/g, '');
-  const hhmm = t.match(/(\d{1,2}):(\d{2})/);
-  if (hhmm) {
-    const h = Number(hhmm[1]);
-    const m = Number(hhmm[2]);
-    if (h < 24 && m < 60) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  }
-  const cn = t.match(/(凌晨|早上|上午|中午|下午|傍晚|晚上|夜里)?(\d{1,2}|[一二三四五六七八九十]{1,3})(?:点|时)(半|(\d{1,2})分)?/);
-  if (!cn) return null;
-  let h = toNum(cn[2]);
-  if (!h && h !== 0) return null;
-  const prefix = cn[1] ?? '';
-  if ((prefix === '下午' || prefix === '傍晚' || prefix === '晚上' || prefix === '夜里') && h < 12) h += 12;
-  if (prefix === '中午' && h < 12) h += 12;
-  if (h >= 24) return null;
-  const minute = cn[3] === '半' ? 30 : cn[4] ? Number(cn[4]) : 0;
-  return `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-}
-
 /** 一天里的空闲时段：9:00–22:00 减去已占用的 */
 export function freeSlots(
   events: EventItem[],
@@ -748,9 +857,6 @@ export function freeSlots(
   return { busy, free };
 }
 
-function fmtMinutes(min: number): string {
-  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
-}
 
 /**
  * 从一句话里抠出一条日程。

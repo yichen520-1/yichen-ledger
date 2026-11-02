@@ -10,6 +10,16 @@ import {
   Upload,
 } from 'lucide-react';
 import { useLedger } from '../state/LedgerContext';
+import {
+  addPersonaNote,
+  clearChatRecords,
+  deletePersonaNote,
+  loadPersonaName,
+  loadPersonaNotes,
+  savePersonaName,
+} from '../db/repository';
+import { hasSpeechSupport, type PersonaNote } from '../domain/persona';
+import { useAssistantState } from '../state/AssistantContext';
 import { Sheet } from '../components/Sheet';
 import { LockScreen, PinForm, useLockConfig } from '../components/LockScreen';
 import { formatCents } from '../domain/model';
@@ -131,6 +141,25 @@ export default function SettingsPage() {
     ['light', t('settings.themeLight')],
   ];
 
+  /* ---- v0.10.0：称呼 / 助手笔记 / 对话记录 ---- */
+  const { refreshPersona } = useAssistantState();
+  const [personaName, setPersonaName] = useState('');
+  const [personaNotes, setPersonaNotes] = useState<PersonaNote[]>([]);
+  const [noteKey, setNoteKey] = useState('');
+  const [noteValue, setNoteValue] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([loadPersonaName(), loadPersonaNotes()]).then(([name, notes]) => {
+      if (!alive) return;
+      setPersonaName(name);
+      setPersonaNotes(notes);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // AI 设置：读一次填进表单，改完点保存才写库
   const { config, save: saveAiConfig } = useAiConfig();
   const [ai, setAi] = useState<AiConfig>(config);
@@ -195,6 +224,36 @@ export default function SettingsPage() {
   }
 
   /* ---------------- 忆小尘开口 ---------------- */
+
+  /** 称呼改完立刻落库，并让对话面板那边同步（不用重启） */
+  async function commitPersonaName(next: string) {
+    setPersonaName(next);
+    await savePersonaName(next);
+    refreshPersona();
+  }
+
+  async function addNote() {
+    if (!noteKey.trim() || !noteValue.trim()) return;
+    const next = await addPersonaNote(noteKey, noteValue);
+    setPersonaNotes(next);
+    setNoteKey('');
+    setNoteValue('');
+    refreshPersona();
+    toast(t('persona.noteSaved'));
+  }
+
+  async function dropNote(id: string) {
+    const next = await deletePersonaNote(id);
+    setPersonaNotes(next);
+    refreshPersona();
+  }
+
+  async function clearChat() {
+    if (!window.confirm(t('persona.historyClearConfirm'))) return;
+    await clearChatRecords();
+    refreshPersona();
+    toast(t('persona.historyCleared'));
+  }
 
   function resetNudge() {
     try {
@@ -640,13 +699,98 @@ export default function SettingsPage() {
       </section>
 
       {/* ---------- 忆小尘 ---------- */}
-      <div className="section-title">{t('assistant.name')}</div>
+      <div className="section-title">{t('persona.groupTitle')}</div>
+
       <section className="card">
+        <Row name={t('persona.nameLabel')} hint={t('persona.nameHint')}>
+          <input
+            className="input"
+            style={{ maxWidth: 160 }}
+            value={personaName}
+            placeholder={t('persona.namePlaceholder')}
+            maxLength={12}
+            onChange={(e) => setPersonaName(e.target.value)}
+            /*
+             * 这里必须读 e.target.value，不能读闭包里的 personaName。
+             * React 的 setState 是异步批处理的：用户打完字立刻点别处，
+             * onBlur 里拿到的可能还是上一轮渲染的旧值（第一次就是空串），
+             * 结果名字存不进去。
+             */
+            onBlur={(e) => void commitPersonaName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            }}
+          />
+        </Row>
+
+        <Row name={t('persona.voiceLabel')} hint={t('persona.voiceHint')}>
+          <span className="muted">{hasSpeechSupport() ? '✓' : t('persona.voiceUnsupported')}</span>
+        </Row>
+
+        <Row name={t('persona.historyTitle')} hint={t('persona.historyHint')}>
+          <button className="btn tiny" onClick={() => void clearChat()}>
+            {t('persona.historyClear')}
+          </button>
+        </Row>
+
         <Row name={t('settings.nudgeReset')} hint={t('settings.nudgeResetHint')}>
           <button className="btn tiny" onClick={resetNudge}>
             {t('settings.nudgeResetBtn')}
           </button>
         </Row>
+      </section>
+
+      {/* 助手笔记：键值对列表，一条一条能删 */}
+      <section className="card" style={{ marginTop: 12 }}>
+        <div className="set-main" style={{ marginBottom: 10 }}>
+          <div className="set-name">{t('persona.notesTitle')}</div>
+          <div className="set-hint">{t('persona.notesHint')}</div>
+        </div>
+
+        {personaNotes.length === 0 ? (
+          <div className="muted" style={{ marginBottom: 12, lineHeight: 1.6 }}>
+            {t('persona.notesEmpty')}
+          </div>
+        ) : (
+          <div style={{ marginBottom: 12 }}>
+            {personaNotes.map((n) => (
+              <div key={n.id} className="set-row" style={{ alignItems: 'flex-start' }}>
+                <div className="set-main">
+                  <div className="set-name">{n.key}</div>
+                  <div className="set-hint">{n.value}</div>
+                </div>
+                <button className="btn tiny" onClick={() => void dropNote(n.id)}>
+                  {t('persona.noteDelete')}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <input
+            className="input grow"
+            style={{ minWidth: 90 }}
+            value={noteKey}
+            placeholder={t('persona.noteKey')}
+            maxLength={20}
+            onChange={(e) => setNoteKey(e.target.value)}
+          />
+          <input
+            className="input grow"
+            style={{ minWidth: 130 }}
+            value={noteValue}
+            placeholder={t('persona.noteValue')}
+            maxLength={120}
+            onChange={(e) => setNoteValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void addNote();
+            }}
+          />
+          <button className="btn tiny" onClick={() => void addNote()} disabled={!noteKey.trim() || !noteValue.trim()}>
+            {t('persona.noteAdd')}
+          </button>
+        </div>
       </section>
 
       {/* ---------- 数据 ---------- */}

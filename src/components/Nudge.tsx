@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Sparkles, X } from 'lucide-react';
 import { useLedger } from '../state/LedgerContext';
 import { useI18n } from '../i18n';
@@ -27,7 +28,7 @@ export function nudgeDisabled(): boolean {
  * 一个记账 App 里，助手安静才说明一切正常。
  */
 export function Nudge() {
-  const { transactions, rules, categories } = useLedger();
+  const { transactions, rules, categories, budgets } = useLedger();
   const { t } = useI18n();
   const [dismissed, setDismissed] = useState(() => nudgeDisabled());
 
@@ -45,9 +46,12 @@ export function Nudge() {
       transactions,
       rules,
       categories,
+      budgets,
+      // 记账提醒要挑时机：晚上九点之后才说，早上不打扰
+      hour: new Date().getHours(),
       lastRecordDate: lastRecordDate(transactions),
     });
-  }, [today, transactions, rules, categories]);
+  }, [today, transactions, rules, categories, budgets]);
 
   if (!nudge || dismissed) return null;
 
@@ -81,6 +85,20 @@ export function Nudge() {
       </span>
       <div className="body">{t(nudge.text as never, nudge.vars)}</div>
       <div className="acts">
+        {/* 月度回顾和异常消费都值得点进去看一眼，其余的就只说一句话 */}
+        {nudge.kind === 'monthlyReview' ? (
+          <Link className="mini-btn" to="/review" onClick={close}>
+            {t('nudge.see')}
+          </Link>
+        ) : nudge.kind === 'abnormal' ? (
+          <Link className="mini-btn" to="/stats" onClick={close}>
+            {t('nudge.see')}
+          </Link>
+        ) : nudge.kind === 'billDue' ? (
+          <Link className="mini-btn" to="/recurring" onClick={close}>
+            {t('nudge.see')}
+          </Link>
+        ) : null}
         <button className="mini-btn" onClick={close}>
           {t('nudge.dismiss')}
         </button>
