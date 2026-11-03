@@ -361,13 +361,14 @@ export function answerLedger(text: string, snap: LedgerSnapshot): Answer {
   const del = parseDeleteCommand(raw, snap);
   if (del) return { kind: 'proposeDelete', target: del };
 
+  /* ---- 批量归类 ---- */
+  const bulk = parseBulkRetarget(raw, snap, parsePeriod(t, snap.today));
+  if (bulk) return { kind: 'proposeBulk', bulk };
+
   /* ---- 改一笔 ---- */
   const edit = parseEditCommand(raw, snap);
   if (edit) return { kind: 'proposeEdit', target: edit };
 
-  /* ---- 批量归类 ---- */
-  const bulk = parseBulkRetarget(raw, snap, parsePeriod(t, snap.today));
-  if (bulk) return { kind: 'proposeBulk', bulk };
 
   /* ---- 建预算 ---- */
   const budgetDraft = parseBudgetCommand(raw, snap, (m) => shiftMonthKey(m, -1));
@@ -446,9 +447,10 @@ export function answerLedger(text: string, snap: LedgerSnapshot): Answer {
     return { kind: 'netWorth', amount: netWorth(snap.accounts, snap.transactions), top: list.slice(0, 4) };
   }
 
-  /* ---- 某个账户的余额 ---- */
-  if (/(余额|还剩|剩下)/.test(t) && !/(预算)/.test(t)) {
-    const hit = snap.accounts.filter((a) => t.includes(a.name));
+  /* ---- 某个账户的余额 / 全部账户的余额 ---- */
+  if (/(余额|还剩|剩下|还有多少|还有多少钱|剩多少)/.test(t) && !/(预算)/.test(t)) {
+    const live = snap.accounts.filter((a) => !a.archived);
+    const hit = live.filter((a) => t.includes(a.name));
     if (hit.length > 0) {
       return {
         kind: 'accountBalance',
@@ -456,6 +458,15 @@ export function answerLedger(text: string, snap: LedgerSnapshot): Answer {
         amount: accountBalance(hit[0], snap.transactions),
         matched: hit.map((a) => a.name),
       };
+    }
+    // 没点名哪个账户（「账户余额」「各账户还有多少」）——
+    // 这时候用户想看的是「每个账户分别多少」，不是一句「没听懂」。
+    // 只有一个账户时才退回单账户形状，否则按净资产形状把明细列出来。
+    if (/(账户|卡|钱包)/.test(t) && live.length > 0) {
+      const list = live
+        .map((a) => ({ name: a.name, amount: accountBalance(a, snap.transactions) }))
+        .sort((a, b) => b.amount - a.amount);
+      return { kind: 'netWorth', amount: netWorth(snap.accounts, snap.transactions), top: list.slice(0, 8) };
     }
   }
 
@@ -512,33 +523,6 @@ export function answerLedger(text: string, snap: LedgerSnapshot): Answer {
     return { kind: 'rising', period, prevMonth: prev, items };
   }
 
-  /* ---- 哪一类花得最多 ---- */
-  if (/(哪一?类|哪个分类|什么最费钱|花在哪|最大头|最多)/.test(t) && !/(涨)/.test(t)) {
-    const list = expenseByCategory(snap.transactions, monthKeyOf(period.from));
-    const total = list.reduce((s, x) => s + x.amount, 0);
-    const first = list[0];
-    return {
-      kind: 'topCategory',
-      period,
-      name: first ? snap.categories.find((c) => c.id === first.categoryId)?.name ?? '—' : '—',
-      amount: first?.amount ?? 0,
-      total,
-      share: total > 0 ? (first?.amount ?? 0) / total : 0,
-      rest: list.slice(1, 4).map((x) => ({
-        name: snap.categories.find((c) => c.id === x.categoryId)?.name ?? '—',
-        amount: x.amount,
-      })),
-    };
-  }
-
-  /* ================================================================
-   * v0.8.0 跨模块问答
-   * ----------------------------------------------------------------
-   * 下面这几段都同时要用到账本和日程。放在最后、unknown 之前，
-   * 是因为它们的关键词比较「泛」（「几次」「那几天」「待确认」），
-   * 排在前面会把「这个月花了多少」这类基础问题抢走。
-   * ================================================================ */
-
   /* ---- 「去杭州那趟一共花了多少」 ---- */
   // 关键词：一趟 / 那次 / 这场 / 那场 + 花钱。日程标题靠包含匹配认。
   // 「那趟」「这趟」比「一趟」更常说 —— 漏掉它，「杭州出差那趟花了多少」就被
@@ -548,13 +532,27 @@ export function answerLedger(text: string, snap: LedgerSnapshot): Answer {
     /(花|支出|消费|花了多少|一共)/.test(t)
   ) {
     const events = snap.events ?? [];
-    // 找出标题里跟这句话有交集的日程
+    /*
+     * 认日程标题，两条路：
+     *
+     *   1) 整标题原样出现在句子里 —— 最可靠。用户说「杭州出差那趟花了多少」
+     *      时标题是完整出现的，这条路径既不会漏也不会误伤。
+     *   2) 模糊匹配：标题的字在本句覆盖 60% 以上。用来兜「杭州出差」被说成
+     *      「杭州那趟」这种情况。门槛从 50% 提到 60%，并且要求至少 2 个字，
+     *      否则「开会」这种两个字里命中一个的也会被认成匹配。
+     *
+     * 为什么要两条：只做 1) 会漏掉简写，只做 2) 会在「这周开会花了多少」
+     * 这种句子上把任何带「会」字的日程都算进去。
+     */
     const hit = events
       .filter((ev) => {
-        // 标题的字在这句话里出现过 2 个以上，就算提到它
-        const chars = [...new Set(ev.title.replace(/[\s\p{P}]/gu, '').split(''))];
+        const title = ev.title.trim();
+        if (!title) return false;
+        if (t.includes(title)) return true;
+        const chars = [...new Set(title.replace(/[\s\p{P}]/gu, '').split(''))];
+        if (chars.length < 2) return false;
         const common = chars.filter((c) => t.includes(c));
-        return common.length >= 2 && common.length / Math.max(chars.length, 1) >= 0.5;
+        return common.length >= 2 && common.length / chars.length >= 0.6;
       })
       .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -586,6 +584,34 @@ export function answerLedger(text: string, snap: LedgerSnapshot): Answer {
       };
     }
   }
+
+  /* ---- 哪一类花得最多 ---- */
+  if (/(哪一?类|哪个分类|什么最费钱|花在哪|最大头|最多)/.test(t) && !/(涨)/.test(t)) {
+    const list = expenseByCategory(snap.transactions, monthKeyOf(period.from));
+    const total = list.reduce((s, x) => s + x.amount, 0);
+    const first = list[0];
+    return {
+      kind: 'topCategory',
+      period,
+      name: first ? snap.categories.find((c) => c.id === first.categoryId)?.name ?? '—' : '—',
+      amount: first?.amount ?? 0,
+      total,
+      share: total > 0 ? (first?.amount ?? 0) / total : 0,
+      rest: list.slice(1, 4).map((x) => ({
+        name: snap.categories.find((c) => c.id === x.categoryId)?.name ?? '—',
+        amount: x.amount,
+      })),
+    };
+  }
+
+  /* ================================================================
+   * v0.8.0 跨模块问答
+   * ----------------------------------------------------------------
+   * 下面这几段都同时要用到账本和日程。放在最后、unknown 之前，
+   * 是因为它们的关键词比较「泛」（「几次」「那几天」「待确认」），
+   * 排在前面会把「这个月花了多少」这类基础问题抢走。
+   * ================================================================ */
+
 
   /* ---- 「这个月看电影花了几次，分别是哪几天」 ---- */
   // 关键词组合：次数 + 花钱（或直接问「哪几笔」）。分类靠 matchCategory 认。
@@ -863,7 +889,16 @@ export function freeSlots(
  * 「提醒我周三交报告」「明天下午三点开会」「周五 14:00-15:30 评审」
  */
 export function parseEventCommand(text: string, snap: ScheduleSnapshot): ProposedEvent | null {
-  if (!/(提醒我|加个?日程|新建日程|建个日程|安排|schedule|记得)/.test(text)) return null;
+  /*
+   * 触发词。v0.10.1 修了两处：
+   *   1) 「安排」原来是不带边界的 /安排/，于是「这周有什么安排」也会命中，
+   *      然后被拆出一条标题叫「有什么安排」的日程。现在只认祈使句开头的
+   *      「安排一下 / 安排个」。
+   *   2) 加一条硬性排除：句子里带疑问词就是「问」而不是「让」。
+   *      「这周有什么安排」「周末有安排吗」都不该变成新建日程。
+   */
+  if (/(什么|哪些|哪些个|多少|几个|几天|有没有|是不是|吗|呢|咋|怎么|如何)/.test(text)) return null;
+  if (!/(提醒我|加个?日程|加一个日程|新建日程|建个日程|^安排|schedule|记得)/.test(text)) return null;
 
   let body = text
     .replace(/^(帮我)?(提醒我|加个日程|加一个日程|新建日程|建个日程|安排一下|安排)/, '')
@@ -945,18 +980,67 @@ export function answerSchedule(text: string, snap: ScheduleSnapshot): Answer {
   }
 
   /* ---- 某个区间有几个 / 有哪些 ---- */
-  const period = parsePeriod(t, snap.today) ?? resolvePeriod('thisWeek', 1, snap.today);
-  const occs = occInPeriod(snap.events, period);
+  //
+  // 这里必须有个闸门。原来是无条件兜底成「这周有几个日程」，于是
+  // 「你好」「谢谢」「今天几号」全被答成「这周没有日程」—— 用户看到的
+  // 就是一个完全不接话的助手（v0.10.1 修）。
+  //
+  // 闸门怎么定：只有「问句里确实出现了时间词或日程词」才走日程清单，
+  // 否则交给上层去试闲聊，试不出来再退回 vague。
+  // 「今天几号」「今天星期几」「现在几点」问的是日历/时钟，不是日程 ——
+  // 先让给闲聊表（chat.ts 的 date / clock），否则会被下面的时间词闸门抢走。
+  if (/(今天几号|今天是什么日子|几月几号|今天.{0,2}(星期|周)几|现在几点|几点了|现在.{0,3}时间)/.test(t)) {
+    return { kind: 'vague', guess: 'smalltalk', hints: ['week', 'addEvent'], said: raw };
+  }
+
+  const hasTimeWord = /(今天|今日|明天|明日|后天|昨天|昨日|前天|这周|本周|这一周|上周|下周|下星期|这个月|本月|上个月|下个月|今年|去年|明年|周末|星期[一二三四五六日天]|周[一二三四五六日天]|\d+月)/.test(t);
+  const hasEventWord = /(日程|安排|行程|活动|会议|开会|约会|事|忙|空|计划|待办)/.test(t);
+
+  /*
+   * 钱味要压过时间词。
+   *
+   * 「这个月花了多少」里有时间词「这个月」，但它问的是钱 ——
+   * 在日程模式下答「这个月有 5 个日程」是答非所问。
+   * 所以先看有没有明确的记账词，有就交给上层提示「去记账那边」。
+   *
+   * 注意只在**没有日程词**时才这么做：「这周安排花了不少时间」这种
+   * 混着说的句子仍然按日程处理，不然用户问日程反而被推走。
+   */
+  const strongMoney = /(花了多少|支出|收入|消费|开销|花了|记账|记一笔|转账|报销|预算|余额|账户)/.test(t);
+  if (strongMoney && !hasEventWord) {
+    return { kind: 'vague', guess: 'money', hints: ['spend', 'top', 'budget', 'net'], said: raw };
+  }
+
+  if (hasTimeWord || hasEventWord) {
+    const period = parsePeriod(t, snap.today) ?? resolvePeriod('thisWeek', 1, snap.today);
+    const occs = occInPeriod(snap.events, period);
+    return {
+      kind: 'eventsInPeriod',
+      period,
+      items: occs.map((o) => ({
+        title: o.event.title,
+        date: o.date,
+        time: o.event.allDay ? '' : o.event.startTime,
+        allDay: o.event.allDay,
+        done: o.done,
+      })),
+    };
+  }
+
+  /*
+   * 走到这里说明：不是建日程、不是问空闲、不是问接下来、也没有时间/日程词。
+   * 和账本模式一样给一个 vague，让界面层先试闲聊（「你好」「谢谢」「今天几号」
+   * 都在闲聊表里），试不出来再说「这句我没太听懂」。
+   */
+  const weakSchedule = /(日程|安排|时间|忙|空|会议|开会|约|提醒|截止|ddl|赶|计划)/i.test(t);
+  // 「记一笔午饭25」在日程模式下说得完全清楚，只是说错了地方 ——
+  // 该告诉他记账在另一边，而不是「这句我没太听懂」。
+  const weakMoney = /(花|钱|支出|消费|开销|贵|便宜|省|浪费|超支|预算|余额|账户|记一笔|记账|收入|转账|报销)/.test(t);
   return {
-    kind: 'eventsInPeriod',
-    period,
-    items: occs.map((o) => ({
-      title: o.event.title,
-      date: o.date,
-      time: o.event.allDay ? '' : o.event.startTime,
-      allDay: o.event.allDay,
-      done: o.done,
-    })),
+    kind: 'vague',
+    guess: weakSchedule ? 'schedule' : weakMoney ? 'money' : 'smalltalk',
+    hints: weakSchedule ? ['week', 'free', 'addEvent'] : ['week', 'addEvent'],
+    said: raw,
   };
 }
 

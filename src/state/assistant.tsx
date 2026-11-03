@@ -400,6 +400,15 @@ export function renderAnswer(
       });
 
     case 'proposeBulk':
+      // 命中的那几笔本来就全是目标分类 —— 这件事已经成立了，
+      // 不该让用户点一个「确认改这 0 笔」的按钮。
+      if (answer.bulk.already) {
+        return t('assistant.ans.bulkAlready', {
+          cat: answer.bulk.categoryName,
+          from: answer.bulk.periodLabel.from.slice(5),
+          to: answer.bulk.periodLabel.to.slice(5),
+        });
+      }
       return t('assistant.ans.proposeBulk', {
         n: answer.bulk.txIds.length,
         cat: answer.bulk.categoryName,
@@ -711,6 +720,21 @@ export function useAssistant(): AssistantState {
            */
           const raw = renderSmallTalk(smallTalk, t, dict.weekLong);
           text2 = personaName ? withName(`{name}，${raw}`, personaName) : raw;
+        } else if (answer.kind === 'vague') {
+          /*
+           * 闲聊表也认不出，但规则引擎猜到了方向（钱 / 日程）。
+           *
+           * 日程模式下这个方向尤其重要：用户说「记一笔午饭 25」时，
+           * 他说的完全清楚，只是说错了地方 —— 该告诉他「记账在另一边」，
+           * 而不是「这句我没太听懂」让他重说一遍。
+           */
+          const crossMode =
+            mode === 'schedule' && answer.guess === 'money'
+              ? t('assistant.ans.wrongSideLedger')
+              : mode === 'ledger' && answer.guess === 'schedule'
+                ? t('assistant.ans.wrongSideSchedule')
+                : null;
+          if (crossMode) text2 = crossMode;
         }
       }
 
@@ -724,8 +748,18 @@ export function useAssistant(): AssistantState {
        *   - 本地算出了确切数字（花了多少、净资产…），这些本地比模型准。
        * 其余（闲聊、开放问题、闲聊层也认不出的）交给云端。
        */
+      /*
+       * 本地算出来的「确定答案」才不需要问云端。
+       *
+       * v0.10.1 修：vague 原来被算进 localIsFact 了 —— 但 vague 的意思
+       * 恰恰是「我没听懂」，这正是最该交给云端的场景。结果就是填了 Key
+       * 也永远走不到云端，因为规则引擎现在几乎不返回 unknown 了。
+       */
       const localIsFact =
-        answer.kind !== 'unknown' && answer.kind !== 'proposeTransaction' && answer.kind !== 'proposeEvent';
+        answer.kind !== 'unknown' &&
+        answer.kind !== 'vague' &&
+        answer.kind !== 'proposeTransaction' &&
+        answer.kind !== 'proposeEvent';
       try {
         const cfg = cloudRef.current ?? (await loadAiConfig());
         cloudRef.current = cfg;
@@ -778,6 +812,10 @@ export function useAssistant(): AssistantState {
       /**
        * 只有「写操作」才带按钮。七种写操作全都要用户点一下才落库 ——
        * 助手可以提议，但不能替人按下保存键。
+       *
+       * 批量归类有个例外：如果命中的那几笔本来就已经全是目标分类，
+       * 那就没有要写的库，也就没有按钮 —— 否则会出现一个
+       * 「确认改这 0 笔」的按钮，点了什么都不会变。
        */
       const action: ChatAction | undefined =
         answer.kind === 'proposeTransaction'
@@ -788,7 +826,7 @@ export function useAssistant(): AssistantState {
               ? { kind: 'edit', applied: false }
               : answer.kind === 'proposeDelete'
                 ? { kind: 'delete', applied: false }
-                : answer.kind === 'proposeBulk'
+                : answer.kind === 'proposeBulk' && !answer.bulk.already
                   ? { kind: 'bulk', applied: false }
                   : answer.kind === 'proposeBudget'
                     ? { kind: 'budget', applied: false }

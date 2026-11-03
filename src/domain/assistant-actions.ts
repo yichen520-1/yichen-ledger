@@ -296,6 +296,15 @@ function findRecentTarget(
 export interface BulkRetarget {
   /** 要改的那一批 */
   txIds: string[];
+  /**
+   * 命中的账目本来就全是目标分类 —— 一笔都不用改。
+   *
+   * 为什么要有这个字段：用户说「这周打车那几笔都算交通」，如果那几笔
+   * 记的时候就被「打车」这个词自动归到交通了，筛选后会一笔不剩。
+   * 这时候不能当成「没听懂」—— 他说的完全清楚，只是这件事已经成立了。
+   * 要回一句「本来就是交通，不用改」，而不是让他重说一遍。
+   */
+  already: boolean;
   /** 给用户看的样本（最多 5 条） */
   sample: Array<{ date: string; amount: number; note: string }>;
   categoryName: string;
@@ -334,7 +343,7 @@ export function parseBulkRetarget(
    * 反过来，只说「这周吃饭那几笔」时备注可能空着，就得靠分类。
    */
   const words = sourceWords(head, snap.categories);
-  const pool = snap.transactions
+  const matched = snap.transactions
     .filter((tx) => tx.type === 'expense')
     .filter((tx) => tx.date >= period.from && tx.date <= period.to)
     .filter((tx) => {
@@ -343,14 +352,26 @@ export function parseBulkRetarget(
       const byNote = words.some((w) => tx.note.includes(w));
       return byCat || byNote;
     })
-    // 已经是目标分类的不用改
-    .filter((tx) => tx.categoryId !== target.id)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  if (pool.length === 0) return null;
+  // 一笔都没命中 → 真的没法改（用户说的东西在这个范围里不存在）
+  if (matched.length === 0) return null;
+
+  // 命中了，但已经全是目标分类 → 不用改，也不该说「没听懂」
+  const pool = matched.filter((tx) => tx.categoryId !== target.id);
+  if (pool.length === 0) {
+    return {
+      txIds: [],
+      already: true,
+      sample: matched.slice(0, 5).map((tx) => ({ date: tx.date, amount: tx.amount, note: tx.note })),
+      categoryName: target.name,
+      periodLabel: period,
+    };
+  }
 
   return {
     txIds: pool.map((tx) => tx.id),
+    already: false,
     sample: pool.slice(0, 5).map((tx) => ({ date: tx.date, amount: tx.amount, note: tx.note })),
     categoryName: target.name,
     periodLabel: period,

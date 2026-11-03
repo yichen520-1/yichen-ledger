@@ -55,3 +55,6 @@ docs/icon-preview/
 
 # 构建临时目录（vite 打包时把 TEMP 指到这里，避免沙箱写系统临时目录失败）
 .tmp-build/
+
+# 用户自己的作业/草稿文件，不属于本项目
+sort3.c
